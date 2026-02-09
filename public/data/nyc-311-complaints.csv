@@ -1,0 +1,147 @@
+date,complaintType,borough,status,resolutionDays,agency
+2024-01-03,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-01-03,Noise - Commercial,Brooklyn,Closed,2,NYPD
+2024-01-04,Heat/Hot Water,Bronx,Closed,5,HPD
+2024-01-04,Noise - Residential,Queens,Closed,1,NYPD
+2024-01-05,Street Light Condition,Brooklyn,Closed,14,DOT
+2024-01-05,Blocked Driveway,Manhattan,Closed,1,NYPD
+2024-01-06,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-01-06,Water System,Queens,Closed,3,DEP
+2024-01-07,Heat/Hot Water,Manhattan,Closed,4,HPD
+2024-01-07,Noise - Street/Sidewalk,Bronx,Closed,1,NYPD
+2024-01-08,Rodent,Brooklyn,Closed,21,DOHMH
+2024-01-08,Noise - Residential,Staten Island,Closed,1,NYPD
+2024-01-09,Illegal Parking,Manhattan,Closed,1,NYPD
+2024-01-09,Heat/Hot Water,Brooklyn,Pending,12,HPD
+2024-01-10,Noise - Commercial,Manhattan,Closed,3,NYPD
+2024-01-10,Street Condition,Queens,Closed,30,DOT
+2024-01-11,Noise - Residential,Bronx,Closed,1,NYPD
+2024-01-11,Paint/Plaster,Brooklyn,Closed,7,HPD
+2024-01-12,Blocked Driveway,Queens,Closed,1,NYPD
+2024-01-12,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-01-13,Water System,Bronx,Closed,5,DEP
+2024-01-13,Noise - Vehicle,Brooklyn,Closed,1,NYPD
+2024-01-14,Heat/Hot Water,Queens,Closed,6,HPD
+2024-01-14,Rodent,Manhattan,Closed,18,DOHMH
+2024-01-15,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-01-15,Street Light Condition,Staten Island,Closed,10,DOT
+2024-01-16,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-01-16,Illegal Parking,Brooklyn,Closed,1,NYPD
+2024-01-17,Heat/Hot Water,Bronx,Pending,15,HPD
+2024-01-17,Noise - Commercial,Queens,Closed,2,NYPD
+2024-01-18,Blocked Driveway,Manhattan,Closed,1,NYPD
+2024-01-18,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-01-19,Rodent,Queens,Closed,22,DOHMH
+2024-01-19,Water System,Manhattan,Closed,4,DEP
+2024-01-20,Noise - Residential,Bronx,Closed,1,NYPD
+2024-01-20,Street Condition,Brooklyn,Closed,25,DOT
+2024-01-21,Heat/Hot Water,Manhattan,Closed,3,HPD
+2024-01-21,Noise - Street/Sidewalk,Queens,Closed,1,NYPD
+2024-01-22,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-01-22,Paint/Plaster,Bronx,Closed,9,HPD
+2024-01-23,Illegal Parking,Queens,Closed,1,NYPD
+2024-01-23,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-01-24,Heat/Hot Water,Brooklyn,Closed,4,HPD
+2024-01-24,Noise - Vehicle,Manhattan,Closed,1,NYPD
+2024-01-25,Rodent,Brooklyn,Closed,19,DOHMH
+2024-01-25,Street Light Condition,Bronx,Closed,12,DOT
+2024-01-26,Noise - Residential,Queens,Closed,1,NYPD
+2024-01-26,Water System,Brooklyn,Closed,6,DEP
+2024-01-27,Noise - Commercial,Bronx,Closed,2,NYPD
+2024-01-27,Heat/Hot Water,Staten Island,Closed,5,HPD
+2024-01-28,Blocked Driveway,Brooklyn,Closed,1,NYPD
+2024-01-28,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-01-29,Rodent,Bronx,Closed,20,DOHMH
+2024-01-29,Noise - Residential,Queens,Closed,1,NYPD
+2024-01-30,Street Condition,Manhattan,Closed,28,DOT
+2024-01-30,Heat/Hot Water,Brooklyn,Closed,7,HPD
+2024-01-31,Noise - Residential,Bronx,Closed,1,NYPD
+2024-01-31,Noise - Street/Sidewalk,Manhattan,Closed,1,NYPD
+2024-02-01,Water System,Queens,Closed,3,DEP
+2024-02-01,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-02-02,Heat/Hot Water,Bronx,Pending,8,HPD
+2024-02-02,Illegal Parking,Manhattan,Closed,1,NYPD
+2024-02-03,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-02-03,Rodent,Queens,Closed,16,DOHMH
+2024-02-04,Noise - Commercial,Brooklyn,Closed,2,NYPD
+2024-02-04,Street Light Condition,Queens,Closed,11,DOT
+2024-02-05,Heat/Hot Water,Manhattan,Closed,5,HPD
+2024-02-05,Noise - Residential,Bronx,Closed,1,NYPD
+2024-02-06,Blocked Driveway,Queens,Closed,1,NYPD
+2024-02-06,Noise - Vehicle,Brooklyn,Closed,1,NYPD
+2024-02-07,Paint/Plaster,Manhattan,Closed,8,HPD
+2024-02-07,Noise - Residential,Queens,Closed,1,NYPD
+2024-02-08,Rodent,Manhattan,Closed,17,DOHMH
+2024-02-08,Water System,Bronx,Closed,4,DEP
+2024-02-09,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-02-09,Street Condition,Bronx,Closed,32,DOT
+2024-02-10,Heat/Hot Water,Queens,Closed,6,HPD
+2024-02-10,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-02-11,Noise - Street/Sidewalk,Brooklyn,Closed,1,NYPD
+2024-02-11,Illegal Parking,Bronx,Closed,1,NYPD
+2024-02-12,Noise - Residential,Staten Island,Closed,1,NYPD
+2024-02-12,Heat/Hot Water,Brooklyn,Closed,3,HPD
+2024-02-13,Rodent,Brooklyn,Closed,21,DOHMH
+2024-02-13,Noise - Commercial,Manhattan,Closed,2,NYPD
+2024-02-14,Blocked Driveway,Bronx,Closed,1,NYPD
+2024-02-14,Noise - Residential,Queens,Closed,1,NYPD
+2024-02-15,Street Light Condition,Manhattan,Closed,13,DOT
+2024-02-15,Water System,Staten Island,Closed,5,DEP
+2024-02-16,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-02-16,Heat/Hot Water,Bronx,Closed,4,HPD
+2024-02-17,Noise - Vehicle,Queens,Closed,1,NYPD
+2024-02-17,Paint/Plaster,Brooklyn,Closed,10,HPD
+2024-02-18,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-02-18,Rodent,Bronx,Closed,18,DOHMH
+2024-02-19,Heat/Hot Water,Manhattan,Pending,9,HPD
+2024-02-19,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-02-20,Street Condition,Queens,Closed,27,DOT
+2024-02-20,Noise - Commercial,Bronx,Closed,3,NYPD
+2024-02-21,Blocked Driveway,Manhattan,Closed,1,NYPD
+2024-02-21,Noise - Residential,Queens,Closed,1,NYPD
+2024-02-22,Water System,Brooklyn,Closed,4,DEP
+2024-02-22,Illegal Parking,Queens,Closed,1,NYPD
+2024-02-23,Noise - Residential,Bronx,Closed,1,NYPD
+2024-02-23,Heat/Hot Water,Queens,Closed,6,HPD
+2024-02-24,Rodent,Manhattan,Closed,15,DOHMH
+2024-02-24,Noise - Street/Sidewalk,Brooklyn,Closed,1,NYPD
+2024-02-25,Street Light Condition,Bronx,Closed,14,DOT
+2024-02-25,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-02-26,Heat/Hot Water,Brooklyn,Closed,5,HPD
+2024-02-26,Noise - Residential,Queens,Closed,1,NYPD
+2024-02-27,Noise - Vehicle,Manhattan,Closed,1,NYPD
+2024-02-27,Paint/Plaster,Queens,Closed,7,HPD
+2024-02-28,Rodent,Brooklyn,Closed,20,DOHMH
+2024-02-28,Noise - Residential,Bronx,Closed,1,NYPD
+2024-02-29,Blocked Driveway,Brooklyn,Closed,1,NYPD
+2024-02-29,Heat/Hot Water,Staten Island,Closed,4,HPD
+2024-03-01,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-03-01,Water System,Queens,Closed,3,DEP
+2024-03-02,Street Condition,Brooklyn,Closed,22,DOT
+2024-03-02,Noise - Residential,Bronx,Closed,1,NYPD
+2024-03-03,Heat/Hot Water,Manhattan,Closed,4,HPD
+2024-03-03,Noise - Commercial,Queens,Closed,2,NYPD
+2024-03-04,Rodent,Queens,Closed,19,DOHMH
+2024-03-04,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-03-05,Illegal Parking,Manhattan,Closed,1,NYPD
+2024-03-05,Noise - Street/Sidewalk,Queens,Closed,1,NYPD
+2024-03-06,Heat/Hot Water,Bronx,Closed,6,HPD
+2024-03-06,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-03-07,Street Light Condition,Brooklyn,Closed,11,DOT
+2024-03-07,Blocked Driveway,Queens,Closed,1,NYPD
+2024-03-08,Noise - Residential,Queens,Closed,1,NYPD
+2024-03-08,Water System,Manhattan,Closed,5,DEP
+2024-03-09,Noise - Vehicle,Bronx,Closed,1,NYPD
+2024-03-09,Heat/Hot Water,Brooklyn,Closed,3,HPD
+2024-03-10,Rodent,Bronx,Closed,23,DOHMH
+2024-03-10,Noise - Residential,Manhattan,Closed,1,NYPD
+2024-03-11,Paint/Plaster,Manhattan,Closed,6,HPD
+2024-03-11,Noise - Residential,Brooklyn,Closed,1,NYPD
+2024-03-12,Heat/Hot Water,Queens,Pending,10,HPD
+2024-03-12,Noise - Commercial,Manhattan,Closed,2,NYPD
+2024-03-13,Street Condition,Bronx,Closed,29,DOT
+2024-03-13,Noise - Residential,Staten Island,Closed,1,NYPD
+2024-03-14,Blocked Driveway,Brooklyn,Closed,1,NYPD
+2024-03-14,Illegal Parking,Bronx,Closed,1,NYPD
+2024-03-15,Noise - Residential,Queens,Closed,1,NYPD
+2024-03-15,Heat/Hot Water,Manhattan,Closed,5,HPD

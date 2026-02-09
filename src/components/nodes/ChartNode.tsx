@@ -1,0 +1,241 @@
+import { useState, useCallback, useMemo } from 'react';
+import { type NodeProps } from '@xyflow/react';
+import { BarChart3, Maximize2 } from 'lucide-react';
+import { BaseNode } from './BaseNode';
+import { useCanvasStore } from '@/stores/canvasStore';
+import { useUpstreamData } from '@/hooks/useUpstreamData';
+import { cn } from '@/lib/utils';
+import { ChartPreviewModal } from './ChartPreviewModal';
+import { D3Chart } from '@/components/charts/D3Chart';
+import type { ChartNodeData } from '@/types';
+
+const CHART_TYPES = ['bar', 'line', 'area', 'scatter', 'pie'] as const;
+
+type ChartNodeProps = NodeProps & {
+  data: ChartNodeData;
+};
+
+export function ChartNode({ id, data }: ChartNodeProps) {
+  const confirmNode = useCanvasStore((s) => s.confirmNode);
+  const updateNode = useCanvasStore((s) => s.updateNode);
+  const upstreamData = useUpstreamData(id);
+
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const columns = upstreamData?.columns ?? [];
+  const chartData = upstreamData?.rows ?? [];
+
+  // Config object for the AI explanation
+  const explanationConfig = useMemo(
+    () => ({
+      chartType: data.chartType,
+      xAxis: data.xAxis,
+      yAxis: data.yAxis,
+      colorBy: data.colorBy,
+    }),
+    [data.chartType, data.xAxis, data.yAxis, data.colorBy]
+  );
+
+  // Code view handlers
+  const handleToggleCodeMode = useCallback(() => {
+    updateNode(id, { isCodeMode: !data.isCodeMode });
+  }, [id, data.isCodeMode, updateNode]);
+
+  const handleCodeChange = useCallback(
+    (code: string) => {
+      updateNode(id, { customCode: code, isCodeMode: true });
+    },
+    [id, updateNode]
+  );
+
+  const handleOpenPreview = useCallback(() => {
+    if (data.xAxis && data.yAxis && chartData.length > 0) {
+      setIsPreviewOpen(true);
+    }
+  }, [data.xAxis, data.yAxis, chartData.length]);
+
+  const hasChart = data.xAxis && data.yAxis && chartData.length > 0;
+
+  const previewData = useMemo(() => chartData.slice(0, 100), [chartData]);
+
+  return (
+    <>
+      <BaseNode
+        state={data.state}
+        title="Chart"
+        icon={<BarChart3 size={16} />}
+        inputs={1}
+        outputs={0}
+        onConfirm={() => confirmNode(id)}
+        nodeType="chart"
+        nodeConfig={explanationConfig}
+        isCodeMode={data.isCodeMode}
+        customCode={data.customCode}
+        onToggleCodeMode={handleToggleCodeMode}
+        onCodeChange={handleCodeChange}
+        wide
+      >
+        <div className="space-y-2">
+          {/* Row 1: chart type buttons + axis dropdowns */}
+          <div className="flex items-end gap-2">
+            {/* Chart type selector */}
+            <div className="shrink-0">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Chart type
+              </label>
+              <div className="flex gap-0.5">
+                {CHART_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateNode(id, { chartType: type });
+                    }}
+                    className={cn(
+                      'rounded-md px-2 py-1 text-[10px] font-medium capitalize transition-colors',
+                      data.chartType === type
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    )}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* X Axis */}
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                X Axis
+              </label>
+              <select
+                value={data.xAxis || ''}
+                onChange={(e) =>
+                  updateNode(id, { xAxis: e.target.value })
+                }
+                className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 outline-none focus:border-blue-300"
+              >
+                <option value="">Select...</option>
+                {columns.map((col) => (
+                  <option key={col.name} value={col.name}>
+                    {col.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Y Axis */}
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Y Axis
+              </label>
+              <select
+                value={data.yAxis || ''}
+                onChange={(e) =>
+                  updateNode(id, { yAxis: e.target.value })
+                }
+                className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 outline-none focus:border-blue-300"
+              >
+                <option value="">Select...</option>
+                {columns.map((col) => (
+                  <option key={col.name} value={col.name}>
+                    {col.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Color-by column */}
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Color by
+              </label>
+              <select
+                value={data.colorBy || ''}
+                onChange={(e) =>
+                  updateNode(id, {
+                    colorBy: e.target.value || undefined,
+                  })
+                }
+                className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 outline-none focus:border-blue-300"
+              >
+                <option value="">None</option>
+                {columns.map((col) => (
+                  <option key={col.name} value={col.name}>
+                    {col.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Inline chart */}
+          <div
+            className={cn(
+              'relative overflow-hidden rounded-lg border border-gray-100 bg-white',
+              hasChart && 'cursor-pointer hover:border-blue-200'
+            )}
+            onDoubleClick={handleOpenPreview}
+          >
+            {hasChart ? (
+              <D3Chart
+                chartType={data.chartType || 'bar'}
+                data={previewData}
+                xAxis={data.xAxis!}
+                yAxis={data.yAxis!}
+                colorBy={data.colorBy}
+                height={280}
+              />
+            ) : (
+              <div className="flex h-[280px] flex-col items-center justify-center text-gray-300">
+                <BarChart3 size={32} />
+                <span className="mt-2 text-xs">Configure chart axes to preview</span>
+              </div>
+            )}
+
+            {/* Expand button for full-screen / export */}
+            {hasChart && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenPreview();
+                }}
+                className="absolute right-2 top-2 rounded-md bg-white/90 p-1.5 text-gray-400 shadow-sm ring-1 ring-gray-200 transition-all hover:text-gray-600 hover:shadow group-hover:opacity-100"
+                title="Full-screen preview &amp; export"
+              >
+                <Maximize2 size={14} />
+              </button>
+            )}
+
+            {/* Data summary inside chart container */}
+            {hasChart && (
+              <div className="border-t border-gray-50 py-1 text-center text-[10px] text-gray-400">
+                {chartData.length.toLocaleString()} data points
+              </div>
+            )}
+          </div>
+
+          {/* No upstream data warning */}
+          {!upstreamData && data.state === 'confirmed' && (
+            <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+              Connect a data source to populate columns
+            </div>
+          )}
+        </div>
+      </BaseNode>
+
+      {/* Full-screen preview modal (for export) */}
+      <ChartPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        chartType={data.chartType || 'bar'}
+        xAxis={data.xAxis || ''}
+        yAxis={data.yAxis || ''}
+        colorBy={data.colorBy}
+        data={chartData}
+        columns={columns}
+      />
+    </>
+  );
+}
