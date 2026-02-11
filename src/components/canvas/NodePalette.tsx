@@ -10,7 +10,7 @@ import {
   Calculator,
   FlipVertical2,
   GripVertical,
-  Sparkles,
+  Wand2,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
 import { PipelinePrompt } from './PipelinePrompt';
@@ -43,20 +43,19 @@ export function NodePalette() {
       <div className="flex h-full w-60 flex-col border-r border-gray-200 bg-white">
         {/* Header */}
         <div className="border-b border-gray-100 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-800">Nodes</h2>
+          <h2 className="text-sm font-semibold text-gray-800">Convoy</h2>
           <p className="mt-0.5 text-[10px] text-gray-400">
             Drag nodes onto the canvas
           </p>
         </div>
 
-        {/* AI Generate button */}
         <div className="border-b border-gray-100 px-3 py-3">
           <button
             onClick={() => setShowPrompt(true)}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-indigo-600 hover:shadow-md active:from-blue-700 active:to-indigo-700"
           >
-            <Sparkles size={16} />
-            Generate with AI
+            <Wand2 size={16} />
+            Build from description
           </button>
         </div>
 

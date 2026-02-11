@@ -5,12 +5,11 @@ export default {
     extend: {
       fontFamily: {
         sans: [
-          'Inter',
+          'ABC Diatype',
           'system-ui',
           '-apple-system',
           'BlinkMacSystemFont',
           'Segoe UI',
-          'Roboto',
           'sans-serif',
         ],
       },

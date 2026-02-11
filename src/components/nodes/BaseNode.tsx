@@ -73,7 +73,7 @@ export const BaseNode = memo(function BaseNode({
     <div
       className={cn(
         'group rounded-lg border-2 bg-white shadow-md transition-all hover:shadow-lg',
-        wide ? 'min-w-[480px] max-w-[520px]' : 'min-w-[240px] max-w-[280px]',
+        wide ? 'min-w-[520px] max-w-[580px]' : 'min-w-[300px] max-w-[340px]',
         {
           'border-dashed border-gray-300 opacity-60': state === 'proposed',
           'border-solid border-gray-200': state === 'confirmed',

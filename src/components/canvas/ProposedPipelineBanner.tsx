@@ -1,4 +1,4 @@
-import { Sparkles, CheckCheck, Trash2, X } from 'lucide-react';
+import { Layers, CheckCheck, Trash2, X } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
 
 export function ProposedPipelineBanner() {
@@ -14,7 +14,7 @@ export function ProposedPipelineBanner() {
     <div className="absolute left-1/2 top-4 z-40 -translate-x-1/2">
       <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-2.5 shadow-lg shadow-blue-100/50">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-blue-500" />
+          <Layers size={16} className="text-blue-500" />
           <span className="text-sm font-medium text-gray-700">
             {proposedCount} proposed {proposedCount === 1 ? 'node' : 'nodes'}
           </span>

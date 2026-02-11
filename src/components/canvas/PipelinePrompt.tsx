@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Sparkles, ArrowRight, X, AlertCircle } from 'lucide-react';
+import { Wand2, ArrowRight, X, AlertCircle } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { generatePipeline } from '@/lib/api';
@@ -74,7 +74,7 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Failed to generate pipeline. Please try again.'
+          : 'Failed to build pipeline. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -103,14 +103,14 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-              <Sparkles className="text-blue-500" size={18} />
+              <Wand2 className="text-blue-500" size={18} />
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-900">
                 What do you want to visualize?
               </h2>
               <p className="text-xs text-gray-500">
-                Describe in plain English and AI will build the pipeline
+                Describe in plain English and we'll build the pipeline
               </p>
             </div>
           </div>
@@ -137,7 +137,7 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
           <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2">
             <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-amber-500" />
             <p className="text-xs text-amber-700">
-              Add a Data Source node and upload a CSV file first to enable AI
+              Add a Data Source node and upload a CSV file first to get
               pipeline suggestions.
             </p>
           </div>
@@ -207,11 +207,11 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
               {isLoading ? (
                 <>
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Generating...
+                  Building...
                 </>
               ) : (
                 <>
-                  Generate pipeline
+                  Build pipeline
                   <ArrowRight size={16} />
                 </>
               )}
