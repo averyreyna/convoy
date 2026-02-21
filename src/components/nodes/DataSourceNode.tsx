@@ -57,7 +57,7 @@ function inferColumnType(value: unknown): Column['type'] {
   return 'string';
 }
 
-export function DataSourceNode({ id, data }: DataSourceNodeProps) {
+export function DataSourceNode({ id, data, selected }: DataSourceNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const setNodeData = useDataStore((s) => s.setNodeData);
@@ -342,9 +342,11 @@ export function DataSourceNode({ id, data }: DataSourceNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Data Source"
       icon={<Table size={16} />}
+      selected={selected}
       inputs={0}
       outputs={1}
       onConfirm={() => confirmNode(id)}

@@ -112,6 +112,9 @@ export function ConvoyCanvas() {
         snapGrid={[16, 16]}
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
         deleteKeyCode={['Backspace', 'Delete']}
+        selectionOnDrag
+        selectionKeyCode="Shift"
+        multiSelectionKeyCode="Shift"
       >
         <Background
           variant={BackgroundVariant.Dots}

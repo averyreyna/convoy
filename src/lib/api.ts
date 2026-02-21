@@ -135,3 +135,51 @@ export async function importPipelineFromD3(
 
   return data;
 }
+
+/** Schema for edit-nodes (optional). */
+export interface EditNodesSchema {
+  columns: Array<{ name: string; type: string }>;
+}
+
+/** Pipeline context for edit-nodes (optional). */
+export interface EditNodesPipelineContext {
+  nodes: Array<{ id: string; type?: string; position?: { x: number; y: number }; data?: Record<string, unknown> }>;
+  edges: Array<{ id: string; source: string; target: string }>;
+}
+
+/** Response from edit-nodes API. */
+export interface EditNodesResponse {
+  updates: Record<string, { config?: Record<string, unknown>; customCode?: string }>;
+}
+
+/**
+ * Edit selected nodes with AI. Sends selected node IDs, prompt, optional schema and pipeline context.
+ * Returns per-node updates (config and/or customCode) to apply via updateNode.
+ */
+export async function editNodes(params: {
+  nodeIds: string[];
+  prompt: string;
+  schema?: EditNodesSchema;
+  pipelineContext?: EditNodesPipelineContext;
+}): Promise<EditNodesResponse> {
+  const { nodeIds, prompt, schema, pipelineContext } = params;
+
+  const response = await fetch('/api/edit-nodes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nodeIds,
+      prompt,
+      ...(schema && { schema }),
+      ...(pipelineContext && { pipelineContext }),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `Edit nodes failed with status ${response.status}`);
+  }
+
+  const data: EditNodesResponse = await response.json();
+  return data;
+}

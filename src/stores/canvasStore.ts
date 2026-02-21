@@ -30,6 +30,12 @@ interface CanvasStore {
   setBaselineFromPin: (code: string, language: BaselineLanguage) => void;
   clearBaseline: () => void;
 
+  // Per-node baseline for inline diff: "Pin selection" writes selected nodes' config/code here
+  baselineByNodeId: Record<string, { config: Record<string, unknown>; customCode?: string }>;
+  setBaselineForSelection: () => void;
+  clearNodeBaseline: (nodeId: string) => void;
+  clearAllNodeBaselines: () => void;
+
   // Node operations
   addNode: (node: Node) => void;
   updateNode: (id: string, data: Partial<Record<string, unknown>>) => void;
@@ -69,6 +75,31 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set({ baselineCode: code, baselineLanguage: language }),
   clearBaseline: () => set({ baselineCode: null, baselineLanguage: null }),
 
+  baselineByNodeId: {},
+  setBaselineForSelection: () =>
+    set((state) => {
+      const selected = state.nodes.filter((n) => n.selected);
+      if (selected.length === 0) return state;
+      const next: Record<string, { config: Record<string, unknown>; customCode?: string }> = {
+        ...state.baselineByNodeId,
+      };
+      for (const node of selected) {
+        const data = (node.data || {}) as Record<string, unknown>;
+        const { state: _nodeState, label: _l, error: _e, inputRowCount: _i, outputRowCount: _o, ...config } = data;
+        next[node.id] = {
+          config: { ...config },
+          customCode: typeof data.customCode === 'string' ? data.customCode : undefined,
+        };
+      }
+      return { baselineByNodeId: next };
+    }),
+  clearNodeBaseline: (nodeId) =>
+    set((state) => {
+      const { [nodeId]: _, ...rest } = state.baselineByNodeId;
+      return { baselineByNodeId: rest };
+    }),
+  clearAllNodeBaselines: () => set({ baselineByNodeId: {} }),
+
   addNode: (node) =>
     set((state) => ({
       nodes: [...state.nodes, node],
@@ -84,12 +115,16 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     })),
 
   removeNode: (id) =>
-    set((state) => ({
-      nodes: state.nodes.filter((node) => node.id !== id),
-      edges: state.edges.filter(
-        (edge) => edge.source !== id && edge.target !== id
-      ),
-    })),
+    set((state) => {
+      const { [id]: _, ...baselineRest } = state.baselineByNodeId;
+      return {
+        nodes: state.nodes.filter((node) => node.id !== id),
+        edges: state.edges.filter(
+          (edge) => edge.source !== id && edge.target !== id
+        ),
+        baselineByNodeId: baselineRest,
+      };
+    }),
 
   confirmNode: (id) =>
     set((state) => ({

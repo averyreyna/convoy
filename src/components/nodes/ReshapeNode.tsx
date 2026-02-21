@@ -12,7 +12,7 @@ type ReshapeNodeProps = NodeProps & {
   data: ReshapeNodeData;
 };
 
-export function ReshapeNode({ id, data }: ReshapeNodeProps) {
+export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -65,9 +65,11 @@ export function ReshapeNode({ id, data }: ReshapeNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Reshape"
       icon={<FlipVertical2 size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}

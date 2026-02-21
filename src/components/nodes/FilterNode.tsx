@@ -21,7 +21,7 @@ type FilterNodeProps = NodeProps & {
   data: FilterNodeData;
 };
 
-export function FilterNode({ id, data }: FilterNodeProps) {
+export function FilterNode({ id, data, selected }: FilterNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -61,9 +61,11 @@ export function FilterNode({ id, data }: FilterNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Filter"
       icon={<Filter size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}

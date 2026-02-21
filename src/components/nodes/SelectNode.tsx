@@ -12,7 +12,7 @@ type SelectNodeProps = NodeProps & {
   data: SelectNodeData;
 };
 
-export function SelectNode({ id, data }: SelectNodeProps) {
+export function SelectNode({ id, data, selected }: SelectNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -73,9 +73,11 @@ export function SelectNode({ id, data }: SelectNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Select Columns"
       icon={<Columns3 size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}

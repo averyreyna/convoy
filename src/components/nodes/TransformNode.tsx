@@ -30,7 +30,7 @@ const DEFAULT_TRANSFORM_CODE = `// The input data is available as 'rows' (array 
 
 return { columns, rows };`;
 
-export function TransformNode({ id, data }: TransformNodeProps) {
+export function TransformNode({ id, data, selected }: TransformNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -68,9 +68,11 @@ export function TransformNode({ id, data }: TransformNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Transform"
       icon={<Code2 size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}

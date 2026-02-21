@@ -12,7 +12,7 @@ type SortNodeProps = NodeProps & {
   data: SortNodeData;
 };
 
-export function SortNode({ id, data }: SortNodeProps) {
+export function SortNode({ id, data, selected }: SortNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -51,9 +51,11 @@ export function SortNode({ id, data }: SortNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Sort"
       icon={<ArrowUpDown size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}

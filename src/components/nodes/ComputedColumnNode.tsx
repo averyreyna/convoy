@@ -12,7 +12,7 @@ type ComputedColumnNodeProps = NodeProps & {
   data: ComputedColumnNodeData;
 };
 
-export function ComputedColumnNode({ id, data }: ComputedColumnNodeProps) {
+export function ComputedColumnNode({ id, data, selected }: ComputedColumnNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -51,9 +51,11 @@ export function ComputedColumnNode({ id, data }: ComputedColumnNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Computed Column"
       icon={<Calculator size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}

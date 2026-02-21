@@ -20,7 +20,7 @@ type GroupByNodeProps = NodeProps & {
   data: GroupByNodeData;
 };
 
-export function GroupByNode({ id, data }: GroupByNodeProps) {
+export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -68,9 +68,11 @@ export function GroupByNode({ id, data }: GroupByNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Group By"
       icon={<Layers size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}

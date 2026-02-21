@@ -89,3 +89,40 @@ samp {
   width: 100vw;
   height: 100vh;
 }
+
+/* Phase 1: Lilac selection/drag (React Flow box select and drag-selection area) */
+.react-flow {
+  --xy-selection-background-color-default: rgba(200, 180, 220, 0.25);
+  --xy-selection-border-default: 1px dotted rgba(160, 140, 200, 0.9);
+}
+.react-flow__nodesselection,
+.react-flow__nodesselection-rect {
+  background: rgba(200, 180, 220, 0.25);
+  border: 1px dotted rgba(160, 140, 200, 0.9);
+}
+
+/* Selected node: no light fill, only dotted outline (dots rendered by BaseNode SVG) */
+.react-flow__node.selectable.selected {
+  --xy-node-boxshadow-selected: none;
+}
+.react-flow__node.selectable.selected .react-flow__node-default,
+.react-flow__node.selectable.selected .react-flow__node-input,
+.react-flow__node.selectable.selected .react-flow__node-output,
+.react-flow__node.selectable.selected .react-flow__node-group {
+  box-shadow: none;
+  background-color: var(--xy-node-background-color, #fff);
+}
+.react-flow__node.selected > div {
+  position: relative;
+  box-shadow: none;
+}
+
+/* Marching dots along node perimeter (used by BaseNode SVG) */
+@keyframes node-selection-perimeter {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+.node-selection-stroke {
+  animation: node-selection-perimeter 2.5s linear infinite;
+}

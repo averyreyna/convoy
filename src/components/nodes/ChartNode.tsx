@@ -15,7 +15,7 @@ type ChartNodeProps = NodeProps & {
   data: ChartNodeData;
 };
 
-export function ChartNode({ id, data }: ChartNodeProps) {
+export function ChartNode({ id, data, selected }: ChartNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const upstreamData = useUpstreamData(id);
@@ -61,9 +61,11 @@ export function ChartNode({ id, data }: ChartNodeProps) {
   return (
     <>
       <BaseNode
+        nodeId={id}
         state={data.state}
         title="Chart"
         icon={<BarChart3 size={16} />}
+        selected={selected}
         inputs={1}
         outputs={0}
         onConfirm={() => confirmNode(id)}
