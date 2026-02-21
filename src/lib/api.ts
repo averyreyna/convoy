@@ -3,7 +3,7 @@
  * Communicates with the Express backend that wraps the Anthropic Claude API.
  */
 
-import type { ProposedPipeline } from '@/types';
+import type { ProposedPipeline, ImportFromPythonResponse, ImportFromD3Response } from '@/types';
 
 interface DataSchema {
   columns: Array<{ name: string; type: string }>;
@@ -71,4 +71,67 @@ export async function generateExplanation(params: {
 
   const data: { explanation: string } = await response.json();
   return data.explanation;
+}
+
+/**
+ * Import a pipeline from Python (pandas) source.
+ * Server uses AST extraction first, then LLM fallback for complex scripts.
+ */
+export async function importPipelineFromPython(
+  source: string
+): Promise<ImportFromPythonResponse> {
+  const response = await fetch('/api/import-from-python', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `Import failed with status ${response.status}`);
+  }
+
+  const data: ImportFromPythonResponse = await response.json();
+
+  if (!data.pipeline?.nodes || !Array.isArray(data.pipeline.nodes)) {
+    throw new Error('Invalid import response: missing pipeline.nodes');
+  }
+
+  if (!data.pipeline.explanation) {
+    data.pipeline.explanation = 'Imported from Python script';
+  }
+
+  return data;
+}
+
+/**
+ * Import a pipeline from a D3.js script.
+ * Server uses pattern-based extraction first, then LLM fallback.
+ * Produces a pipeline with optional dataSource + chart node for visualization.
+ */
+export async function importPipelineFromD3(
+  source: string
+): Promise<ImportFromD3Response> {
+  const response = await fetch('/api/import-from-d3', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `Import failed with status ${response.status}`);
+  }
+
+  const data: ImportFromD3Response = await response.json();
+
+  if (!data.pipeline?.nodes || !Array.isArray(data.pipeline.nodes)) {
+    throw new Error('Invalid import response: missing pipeline.nodes');
+  }
+
+  if (!data.pipeline.explanation) {
+    data.pipeline.explanation = 'Imported from D3.js script';
+  }
+
+  return data;
 }

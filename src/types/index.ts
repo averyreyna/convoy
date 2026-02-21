@@ -95,6 +95,18 @@ export interface ProposedPipeline {
   explanation: string;
 }
 
+// Response from import-from-python API
+export interface ImportFromPythonResponse {
+  pipeline: ProposedPipeline;
+  method?: 'ast' | 'llm';
+}
+
+// Response from import-from-d3 API
+export interface ImportFromD3Response {
+  pipeline: ProposedPipeline;
+  method?: 'pattern' | 'llm';
+}
+
 // Node type metadata for the palette
 export interface NodeTypeInfo {
   type: string;

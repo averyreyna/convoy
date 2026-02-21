@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Table2 } from 'lucide-react';
 import type { DataFrame } from '@/types';
 
+/** Maximum rows to render in the preview table for large datasets (keeps UI fast). */
+const PREVIEW_ROW_CAP = 500;
+
 interface DataPreviewProps {
   /** The DataFrame to preview */
   data: DataFrame | undefined;
@@ -28,10 +31,13 @@ export function DataPreview({
 
   if (!data || data.rows.length === 0) return null;
 
+  const totalRows = data.rows.length;
+  const cappedMaxRows = Math.min(maxRows, PREVIEW_ROW_CAP, totalRows);
   const displayColumns = data.columns.slice(0, maxCols);
-  const displayRows = data.rows.slice(0, maxRows);
+  const displayRows = data.rows.slice(0, cappedMaxRows);
   const hasMoreCols = data.columns.length > maxCols;
-  const hasMoreRows = data.rows.length > maxRows;
+  const hasMoreRows = totalRows > cappedMaxRows;
+  const isLargeDataset = totalRows > PREVIEW_ROW_CAP;
 
   return (
     <div className="space-y-1">
@@ -99,10 +105,12 @@ export function DataPreview({
         </div>
       )}
 
-      {/* Row count footer */}
+      {/* Row count footer: for large datasets show "first N of M", else "N of M" */}
       {isOpen && hasMoreRows && (
         <div className="text-center text-[10px] text-gray-300">
-          Showing {displayRows.length} of {data.rows.length.toLocaleString()} rows
+          {isLargeDataset
+            ? `Showing first ${displayRows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
+            : `Showing ${displayRows.length} of ${totalRows.toLocaleString()} rows`}
         </div>
       )}
     </div>

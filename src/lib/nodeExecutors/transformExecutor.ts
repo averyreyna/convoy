@@ -1,3 +1,4 @@
+import * as d3 from 'd3';
 import type { DataFrame, Column } from '@/types';
 
 export interface TransformConfig {
@@ -50,11 +51,14 @@ function validateDataFrameShape(value: unknown): DataFrame {
 /**
  * Execute a transform node by running user-provided JavaScript code.
  *
- * The code receives `rows` (array of objects) and `columns` (array of {name, type})
- * and must return `{ columns, rows }`.
+ * The code receives `rows` (array of objects), `columns` (array of {name, type}),
+ * and `d3` (the D3 library) so generated/pasted D3-style code (e.g. d3.flatRollup,
+ * d3.sum) runs without "d3 is not defined".
+ *
+ * Must return `{ columns, rows }`.
  *
  * Uses `new Function()` for sandboxed execution (same-origin, no access to
- * module scope, imports, or DOM).
+ * module scope or DOM beyond what we inject).
  */
 export function executeTransform(
   input: DataFrame,
@@ -71,17 +75,15 @@ export function executeTransform(
   const columnsCopy = JSON.parse(JSON.stringify(input.columns));
 
   try {
-    // Wrap user code in a function that receives rows and columns
-    // The user code should end with `return { columns, rows }`
     const fn = new Function(
       'rows',
       'columns',
-      // Provide a minimal helper for convenience
+      'd3',
       `"use strict";
 ${customCode}`
     );
 
-    const result = fn(rowsCopy, columnsCopy);
+    const result = fn(rowsCopy, columnsCopy, d3);
     return validateDataFrameShape(result);
   } catch (err) {
     if (err instanceof SyntaxError) {

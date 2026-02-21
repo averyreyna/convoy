@@ -62,8 +62,9 @@ export const BaseNode = memo(function BaseNode({
   upstreamColumns,
 }: BaseNodeProps) {
   const showExplanation = state === 'confirmed' && nodeType && nodeConfig;
+  // Allow code view when confirmed or when in error so the user can edit and recompile
   const showCodeToggle =
-    state === 'confirmed' &&
+    (state === 'confirmed' || state === 'error') &&
     nodeType &&
     nodeConfig &&
     onToggleCodeMode &&

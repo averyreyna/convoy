@@ -1,20 +1,24 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Panel, useReactFlow } from '@xyflow/react';
-import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Download, ExternalLink } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Download, ExternalLink, GitCompare } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { downloadPipelineScript } from '@/lib/exportPipeline';
 import { checkDatawrapperStatus } from '@/lib/datawrapper';
 import { DatawrapperExportModal } from './DatawrapperExportModal';
+import { ScriptDiffModal } from './ScriptDiffModal';
 
 export function CanvasControls() {
   const { zoomIn, zoomOut, fitView, setViewport } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
+  const setShowImportD3Modal = useCanvasStore((s) => s.setShowImportD3Modal);
 
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [dwConfigured, setDwConfigured] = useState<boolean | null>(null);
   const [showDwModal, setShowDwModal] = useState(false);
+  const [showDiffModal, setShowDiffModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const handleReset = () => {
@@ -99,77 +103,118 @@ export function CanvasControls() {
   return (
     <>
       <Panel position="bottom-right" className="flex gap-1">
-        {/* Export button */}
-        {hasNodes && (
-          <div ref={menuRef} className="relative">
-            <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+        {/* Export button — always visible so "Code changes" and import are findable */}
+        <div ref={menuRef} className="relative">
+          <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              aria-label="Export and code changes"
+              title="Export, import, and view code diff"
+            >
+              <Download size={14} />
+              Export
+            </button>
+          </div>
+
+          {/* Export dropdown menu */}
+          {showExportMenu && (
+            <div className="absolute bottom-full right-0 mb-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
               <button
-                onClick={() => setShowExportMenu((v) => !v)}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-                aria-label="Export pipeline"
-                title="Export pipeline as script"
+                onClick={() => {
+                  setShowExportMenu(false);
+                  setShowImportModal(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
               >
-                <Download size={14} />
-                Export
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700">
+                  PY
+                </span>
+                Import from Python
               </button>
-            </div>
+              <button
+                onClick={() => {
+                  setShowExportMenu(false);
+                  setShowImportD3Modal(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-amber-100 text-[9px] font-bold text-amber-700">
+                  D3
+                </span>
+                Import from D3
+              </button>
+              <button
+                onClick={() => {
+                  setShowExportMenu(false);
+                  setShowDiffModal(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                title="View diff between baseline and current export (Phase 1)"
+              >
+                <GitCompare size={14} className="text-gray-500" />
+                Code changes
+              </button>
+              <button
+                onClick={() => {
+                  downloadPipelineScript(nodes, edges, 'javascript');
+                  setShowExportMenu(false);
+                }}
+                disabled={!hasNodes}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
+                  hasNodes ? 'text-gray-700 hover:bg-gray-50' : 'cursor-not-allowed text-gray-400'
+                }`}
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-yellow-100 text-[9px] font-bold text-yellow-700">
+                  JS
+                </span>
+                Export as JavaScript
+              </button>
+              <button
+                onClick={() => {
+                  downloadPipelineScript(nodes, edges, 'python');
+                  setShowExportMenu(false);
+                }}
+                disabled={!hasNodes}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
+                  hasNodes ? 'text-gray-700 hover:bg-gray-50' : 'cursor-not-allowed text-gray-400'
+                }`}
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-100 text-[9px] font-bold text-blue-700">
+                  PY
+                </span>
+                Export as Python
+              </button>
 
-            {/* Export dropdown menu */}
-            {showExportMenu && (
-              <div className="absolute bottom-full right-0 mb-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                <button
-                  onClick={() => {
-                    downloadPipelineScript(nodes, edges, 'javascript');
-                    setShowExportMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="flex h-5 w-5 items-center justify-center rounded bg-yellow-100 text-[9px] font-bold text-yellow-700">
-                    JS
-                  </span>
-                  Export as JavaScript
-                </button>
-                <button
-                  onClick={() => {
-                    downloadPipelineScript(nodes, edges, 'python');
-                    setShowExportMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-100 text-[9px] font-bold text-blue-700">
-                    PY
-                  </span>
-                  Export as Python
-                </button>
+              {/* Divider */}
+              <div className="my-1 h-px bg-gray-100" />
 
-                {/* Divider */}
-                <div className="my-1 h-px bg-gray-100" />
-
-                {/* Datawrapper export */}
-                <button
-                  onClick={handleDatawrapperExport}
-                  disabled={dwConfigured === false}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
-                    dwConfigured === false
-                      ? 'cursor-not-allowed text-gray-400'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                  title={
-                    dwConfigured === false
+              {/* Datawrapper export */}
+              <button
+                onClick={handleDatawrapperExport}
+                disabled={dwConfigured === false || !hasNodes}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
+                  dwConfigured === false || !hasNodes
+                    ? 'cursor-not-allowed text-gray-400'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+                title={
+                  !hasNodes
+                    ? 'Add nodes to export'
+                    : dwConfigured === false
                       ? 'Add DATAWRAPPER_API_TOKEN to .env to enable'
                       : 'Send pipeline data to Datawrapper'
-                  }
-                >
-                  <span className="flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700">
-                    DW
-                  </span>
-                  Send to Datawrapper
-                  <ExternalLink size={10} className="ml-auto opacity-50" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+                }
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700">
+                  DW
+                </span>
+                Send to Datawrapper
+                <ExternalLink size={10} className="ml-auto opacity-50" />
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Zoom / view controls */}
         <div className="flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
@@ -215,6 +260,12 @@ export function CanvasControls() {
         onClose={() => setShowDwModal(false)}
         dataFrame={dataFrame}
         chartConfig={chartConfig}
+      />
+
+      {/* Script diff / Code changes modal */}
+      <ScriptDiffModal
+        isOpen={showDiffModal}
+        onClose={() => setShowDiffModal(false)}
       />
     </>
   );

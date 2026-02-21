@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { Code2, Settings2, RotateCcw, CheckCircle2, AlertCircle, Circle } from 'lucide-react';
+import { Code2, Settings2, RotateCcw, CheckCircle2, AlertCircle, Circle, ClipboardPaste, Pencil, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateNodeCode, getEditorLanguage } from '@/lib/codeGenerators';
 import { validateSyntax } from '@/lib/codeValidation';
@@ -57,6 +57,10 @@ export function CodeView({
   const [syntaxError, setSyntaxError] = useState<string | undefined>();
   const [editorHeight, setEditorHeight] = useState(120);
 
+  // Batch edit mode: edit freely, then Apply to send all changes and run once
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [draft, setDraft] = useState('');
+
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
   const validationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,6 +73,7 @@ export function CodeView({
   }, [nodeType, config, hasEdited]);
 
   const displayCode = customCode || generatedCode;
+  const editorValue = isEditMode ? draft : displayCode;
 
   // Determine status indicator
   let status: EditorStatus = 'idle';
@@ -135,6 +140,58 @@ export function CodeView({
     },
     [onCodeChange, validateCode]
   );
+
+  // In edit mode: only update draft and validate; do not run node until Apply
+  const handleDraftChange = useCallback(
+    (value: string | undefined) => {
+      if (value !== undefined) {
+        setDraft(value);
+        if (validationTimer.current) clearTimeout(validationTimer.current);
+        validationTimer.current = setTimeout(() => validateCode(value), 300);
+      }
+    },
+    [validateCode]
+  );
+
+  const handleStartEdit = useCallback(() => {
+    setDraft(displayCode);
+    setIsEditMode(true);
+    setSyntaxError(undefined);
+  }, [displayCode]);
+
+  const handleApply = useCallback(() => {
+    setHasEdited(true);
+    onCodeChange(draft);
+    setIsEditMode(false);
+    validateCode(draft);
+    editorRef.current?.focus();
+  }, [draft, onCodeChange, validateCode]);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditMode(false);
+    setDraft('');
+    // Clear validation markers when reverting to saved code
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (editor && monaco) {
+      const model = editor.getModel();
+      if (model) monaco.editor.setModelMarkers(model, 'codeValidation', []);
+    }
+  }, []);
+
+  // ─── Paste code from clipboard (Phase 3: paste snippet and iterate) ─────────────
+  const handlePasteCode = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text.trim()) {
+        setHasEdited(true);
+        onCodeChange(text.trim());
+        editorRef.current?.focus();
+      }
+    } catch {
+      // Permission denied or clipboard empty — no-op
+    }
+  }, [onCodeChange]);
 
   // ─── Reset to generated code ────────────────────────────────────────────────
   const handleReset = useCallback(() => {
@@ -277,32 +334,90 @@ export function CodeView({
   if (codeOnly) {
     return (
       <div className="space-y-2">
-        <div className="overflow-hidden rounded-md border border-gray-200">
+        <div
+          className={cn(
+            'overflow-hidden rounded-md border',
+            isEditMode ? 'border-blue-300 ring-1 ring-blue-200' : 'border-gray-200'
+          )}
+        >
           <Editor
             height={`${editorHeight}px`}
             language={editorLanguage}
-            value={displayCode}
-            onChange={handleEditorChange}
+            value={editorValue}
+            onChange={isEditMode ? handleDraftChange : handleEditorChange}
             onMount={handleEditorMount}
             theme="vs-light"
             options={editorOptions}
           />
         </div>
-        <div className="flex items-center justify-between">
-          {renderStatusIndicator()}
-          {hasEdited && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReset();
-              }}
-              className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
-              title="Reset to generated code"
-            >
-              <RotateCcw size={10} />
-              Reset
-            </button>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-1">
+          {!isEditMode && renderStatusIndicator()}
+          <div className="flex flex-wrap items-center gap-1">
+            {isEditMode ? (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleApply();
+                  }}
+                  className="flex items-center gap-1 text-[9px] font-medium text-emerald-600 transition-colors hover:text-emerald-700"
+                  title="Apply changes and run"
+                >
+                  <Check size={10} />
+                  Apply
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCancelEdit();
+                  }}
+                  className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                  title="Discard edits"
+                >
+                  <X size={10} />
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStartEdit();
+                  }}
+                  className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                  title="Edit code and apply in one shot"
+                >
+                  <Pencil size={10} />
+                  Edit
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePasteCode();
+                  }}
+                  className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                  title="Replace editor content with clipboard"
+                >
+                  <ClipboardPaste size={10} />
+                  Paste code
+                </button>
+                {hasEdited && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReset();
+                    }}
+                    className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                    title="Reset to generated code"
+                  >
+                    <RotateCcw size={10} />
+                    Reset
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
         {renderErrorPanel()}
       </div>
@@ -352,33 +467,91 @@ export function CodeView({
       {/* Code editor (shown when in code mode) */}
       {isCodeMode && (
         <>
-          <div className="overflow-hidden rounded-md border border-gray-200">
+          <div
+            className={cn(
+              'overflow-hidden rounded-md border',
+              isEditMode ? 'border-blue-300 ring-1 ring-blue-200' : 'border-gray-200'
+            )}
+          >
             <Editor
               height={`${editorHeight}px`}
               language={editorLanguage}
-              value={displayCode}
-              onChange={handleEditorChange}
+              value={editorValue}
+              onChange={isEditMode ? handleDraftChange : handleEditorChange}
               onMount={handleEditorMount}
               theme="vs-light"
               options={editorOptions}
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            {renderStatusIndicator()}
-            {hasEdited && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleReset();
-                }}
-                className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
-                title="Reset to generated code"
-              >
-                <RotateCcw size={10} />
-                Reset
-              </button>
-            )}
+          <div className="flex flex-wrap items-center justify-between gap-1">
+            {!isEditMode && renderStatusIndicator()}
+            <div className="flex flex-wrap items-center gap-1">
+              {isEditMode ? (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleApply();
+                    }}
+                    className="flex items-center gap-1 text-[9px] font-medium text-emerald-600 transition-colors hover:text-emerald-700"
+                    title="Apply changes and run"
+                  >
+                    <Check size={10} />
+                    Apply
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCancelEdit();
+                    }}
+                    className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                    title="Discard edits"
+                  >
+                    <X size={10} />
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartEdit();
+                    }}
+                    className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                    title="Edit code and apply in one shot"
+                  >
+                    <Pencil size={10} />
+                    Edit
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePasteCode();
+                    }}
+                    className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                    title="Replace editor content with clipboard"
+                  >
+                    <ClipboardPaste size={10} />
+                    Paste code
+                  </button>
+                  {hasEdited && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReset();
+                      }}
+                      className="flex items-center gap-1 text-[9px] font-medium text-gray-400 transition-colors hover:text-gray-600"
+                      title="Reset to generated code"
+                    >
+                      <RotateCcw size={10} />
+                      Reset
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {renderErrorPanel()}

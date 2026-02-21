@@ -8,14 +8,17 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { Wand2 } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { nodeTypes } from '@/components/nodes';
 import { edgeTypes } from '@/components/edges';
 import { CanvasControls } from './CanvasControls';
 import { nodeTypeInfos } from '@/components/nodes';
 import { PipelinePrompt } from './PipelinePrompt';
+import { ImportFromPythonModal } from './ImportFromPythonModal';
+import { ImportFromD3Modal } from './ImportFromD3Modal';
 import { ProposedPipelineBanner } from './ProposedPipelineBanner';
+import { EntryScreen } from './EntryScreen';
 
 let nodeIdCounter = 0;
 function getNextNodeId() {
@@ -28,6 +31,10 @@ export function ConvoyCanvas() {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
   const [showPrompt, setShowPrompt] = useState(false);
+  const showImportModal = useCanvasStore((s) => s.showImportModal);
+  const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
+  const showImportD3Modal = useCanvasStore((s) => s.showImportD3Modal);
+  const setShowImportD3Modal = useCanvasStore((s) => s.setShowImportD3Modal);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -35,6 +42,7 @@ export function ConvoyCanvas() {
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
   const addNode = useCanvasStore((s) => s.addNode);
+  const showCodeByDefault = usePreferencesStore((s) => s.showCodeByDefault);
 
   const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -57,18 +65,23 @@ export function ConvoyCanvas() {
         y: event.clientY,
       });
 
+      const supportsCodeMode =
+        type !== 'dataSource' && type !== 'transform';
       const newNode = {
         id: getNextNodeId(),
         type,
         position,
         data: {
           ...nodeInfo.defaultData,
+          ...(supportsCodeMode
+            ? { isCodeMode: showCodeByDefault }
+            : {}),
         },
       };
 
       addNode(newNode);
     },
-    [addNode]
+    [addNode, showCodeByDefault]
   );
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
@@ -130,49 +143,24 @@ export function ConvoyCanvas() {
         <PipelinePrompt onClose={() => setShowPrompt(false)} />
       )}
 
-      {/* Empty state overlay — shown when no nodes exist */}
-      {nodes.length === 0 && !showPrompt && (
-        <EmptyCanvasOverlay onOpenPrompt={() => setShowPrompt(true)} />
+      {/* Import from Python modal */}
+      {showImportModal && (
+        <ImportFromPythonModal onClose={() => setShowImportModal(false)} />
       )}
-    </div>
-  );
-}
 
-// ─── Empty Canvas Overlay ───────────────────────────────────────────────────
+      {/* Import from D3 modal */}
+      {showImportD3Modal && (
+        <ImportFromD3Modal onClose={() => setShowImportD3Modal(false)} />
+      )}
 
-function EmptyCanvasOverlay({ onOpenPrompt }: { onOpenPrompt: () => void }) {
-  return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className="pointer-events-auto text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
-          <svg
-            className="h-7 w-7 text-blue-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z"
-            />
-          </svg>
-        </div>
-        <h3 className="mb-1 text-base font-semibold text-gray-700">
-          Start building your pipeline
-        </h3>
-        <p className="mb-4 max-w-xs text-sm text-gray-500">
-          Drag nodes from the sidebar, or describe what you want to build a pipeline.
-        </p>
-        <button
-          onClick={onOpenPrompt}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-600 hover:shadow-md active:bg-blue-700"
-        >
-          <Wand2 size={18} />
-          Build from description
-        </button>
-      </div>
+      {/* Phase 2: NL-first entry — show when no nodes (first paint is prompt/import) */}
+      {nodes.length === 0 && !showImportModal && !showImportD3Modal && (
+        <EntryScreen
+          onOpenPrompt={() => setShowPrompt(true)}
+          onOpenImportPython={() => setShowImportModal(true)}
+          onOpenImportD3={() => setShowImportD3Modal(true)}
+        />
+      )}
     </div>
   );
 }
