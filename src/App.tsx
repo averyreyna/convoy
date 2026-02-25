@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Code2, Globe } from 'lucide-react';
 import { ConvoyCanvas } from '@/components/canvas/ConvoyCanvas';
 import { NodePalette } from '@/components/canvas/NodePalette';
 import { SidebarHeader } from '@/components/canvas/SidebarHeader';
@@ -12,6 +12,7 @@ const DEFAULT_CODE_PCT = 38;
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [codeEditorOpen, setCodeEditorOpen] = useState(true);
   const [codePanelPct, setCodePanelPct] = useState(DEFAULT_CODE_PCT);
   const isDragging = useRef(false);
 
@@ -93,25 +94,67 @@ export default function App() {
           )}
         </button>
 
-        <div className="flex flex-1 min-w-0" style={{ marginLeft: 0 }}>
+        <div className="relative flex flex-1 min-w-0" style={{ marginLeft: 0 }}>
           <div
-            className="min-h-0 min-w-0 shrink-0"
-            style={{ width: `${canvasPct}%` }}
+            className="min-h-0 min-w-0 shrink-0 transition-[width] duration-300 ease-in-out"
+            style={{ width: codeEditorOpen ? `${canvasPct}%` : '100%' }}
           >
             <ConvoyCanvas />
           </div>
+          {codeEditorOpen && (
+            <div
+              role="separator"
+              aria-label="Resize code panel"
+              onMouseDown={handleDividerMouseDown}
+              className="w-1 shrink-0 cursor-col-resize bg-gray-200 transition-colors hover:bg-blue-300"
+            />
+          )}
           <div
-            role="separator"
-            aria-label="Resize code panel"
-            onMouseDown={handleDividerMouseDown}
-            className="w-1 shrink-0 cursor-col-resize bg-gray-200 transition-colors hover:bg-blue-300"
-          />
-          <div
-            className="min-h-0 min-w-0 shrink-0 overflow-hidden"
-            style={{ width: `${codePanelPct}%` }}
+            className="flex min-h-0 shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
+            style={{ width: codeEditorOpen ? `${codePanelPct}%` : 0 }}
           >
-            <PipelineCodePanel />
+            <div
+              className="flex min-h-0 min-w-0 flex-1 flex-col transition-[opacity,transform] duration-300 ease-in-out"
+              style={{
+                opacity: codeEditorOpen ? 1 : 0,
+                transform: codeEditorOpen
+                  ? 'translateX(0)'
+                  : 'translateX(12px)',
+                pointerEvents: codeEditorOpen ? 'auto' : 'none',
+              }}
+            >
+              <PipelineCodePanel />
+            </div>
           </div>
+
+          {/* Code editor toggle — sliding thumb like reference; panel uses same slide animation as node sidebar */}
+          <button
+            type="button"
+            onClick={() => setCodeEditorOpen((v) => !v)}
+            className="absolute bottom-5 left-5 z-30 flex h-9 w-[72px] items-stretch overflow-hidden rounded-lg border border-gray-300 bg-gray-800 shadow-md hover:border-gray-400"
+            title={codeEditorOpen ? 'Close Editor (E)' : 'Open Editor (E)'}
+            aria-label={codeEditorOpen ? 'Close Editor' : 'Open Editor'}
+          >
+            {/* Inactive icons (gray) — full width track */}
+            <span className="flex w-1/2 items-center justify-center text-gray-400" aria-hidden>
+              <Code2 size={16} />
+            </span>
+            <span className="flex w-1/2 items-center justify-center text-gray-400" aria-hidden>
+              <Globe size={16} />
+            </span>
+            {/* Sliding blue thumb with white icons — same duration as sidebar */}
+            <span
+              className="absolute inset-y-0 flex w-1/2 items-center justify-center bg-blue-500 text-white transition-[left] duration-300 ease-in-out"
+              style={{ left: codeEditorOpen ? 0 : '50%' }}
+              aria-hidden
+            >
+              {codeEditorOpen ? (
+                <Code2 size={16} />
+              ) : (
+                <Globe size={16} />
+              )}
+            </span>
+          </button>
         </div>
       </ReactFlowProvider>
     </div>

@@ -1,18 +1,48 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import Editor from '@monaco-editor/react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { generateNodeCode } from '@/lib/codeGenerators';
 import {
   topologicalSort,
   exportAsPython,
+  buildScriptFromCellCodes,
   downloadPipelineScript,
   downloadNotebook,
   copyAsJupyterCells,
 } from '@/lib/exportPipeline';
-import { Copy, Download, FileCode } from 'lucide-react';
+import { runFullPipelineScript } from '@/lib/pythonRunner';
+import { importPipelineFromPython } from '@/lib/api';
+import { Copy, Download, FileCode, Play, Square } from 'lucide-react';
+
+const EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  fontSize: 11,
+  lineNumbers: 'off' as const,
+  folding: false,
+  scrollBeyondLastLine: false,
+  automaticLayout: true,
+  padding: { top: 6, bottom: 6 },
+  wordWrap: 'on' as const,
+  overviewRulerLanes: 0,
+  hideCursorInOverviewRuler: true,
+  scrollbar: {
+    vertical: 'auto' as const,
+    horizontal: 'hidden' as const,
+    verticalScrollbarSize: 6,
+  },
+};
+
+const MIN_EDITOR_HEIGHT = 60;
+const MAX_EDITOR_HEIGHT = 200;
 
 export function PipelineCodePanel() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const updateNode = useCanvasStore((s) => s.updateNode);
+  const setPipelineFromImport = useCanvasStore((s) => s.setPipelineFromImport);
+
+  const [runError, setRunError] = useState<string | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
   const cells = useMemo(() => {
     const sorted = topologicalSort(nodes, edges);
@@ -39,6 +69,44 @@ export function PipelineCodePanel() {
   const fullScript = useMemo(
     () => (nodes.length > 0 ? exportAsPython(nodes, edges) : ''),
     [nodes, edges]
+  );
+
+  const runScriptAndImport = useCallback(
+    async (script: string) => {
+      setRunError(null);
+      setIsRunning(true);
+      try {
+        await runFullPipelineScript(script);
+        const { pipeline } = await importPipelineFromPython(script);
+        setPipelineFromImport(pipeline);
+      } catch (err) {
+        setRunError(err instanceof Error ? err.message : 'Run failed');
+      } finally {
+        setIsRunning(false);
+      }
+    },
+    [setPipelineFromImport]
+  );
+
+  const handleRunAll = useCallback(() => {
+    if (cells.length === 0) return;
+    const script = buildScriptFromCellCodes(cells);
+    runScriptAndImport(script);
+  }, [cells, runScriptAndImport]);
+
+  const handleRunCell = useCallback(
+    (cellIndex: number) => {
+      const script = buildScriptFromCellCodes(cells, cellIndex);
+      runScriptAndImport(script);
+    },
+    [cells, runScriptAndImport]
+  );
+
+  const handleCellChange = useCallback(
+    (nodeId: string, value: string) => {
+      updateNode(nodeId, { customCode: value || undefined });
+    },
+    [updateNode]
   );
 
   const handleCopy = async () => {
@@ -73,6 +141,20 @@ export function PipelineCodePanel() {
       <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-3 py-2">
         <span className="text-xs font-semibold text-gray-700">Pipeline code</span>
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleRunAll}
+            disabled={cells.length === 0 || isRunning}
+            className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
+            title="Run all cells and propose nodes"
+          >
+            {isRunning ? (
+              <Square size={12} className="animate-pulse" />
+            ) : (
+              <Play size={12} />
+            )}
+            Run all
+          </button>
           <button
             type="button"
             onClick={handleCopy}
@@ -111,22 +193,51 @@ export function PipelineCodePanel() {
           </button>
         </div>
       </div>
+
+      {runError && (
+        <div className="shrink-0 border-b border-red-100 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+          {runError}
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto p-2">
         {cells.length === 0 ? (
           <p className="text-xs text-gray-400">Add nodes to see pipeline code.</p>
         ) : (
           <div className="space-y-3">
-            {cells.map((cell) => (
+            {cells.map((cell, index) => (
               <div
                 key={cell.nodeId}
                 className="rounded-lg border border-gray-100 bg-gray-50/80"
               >
-                <div className="border-b border-gray-100 px-2 py-1.5 text-[10px] font-medium text-gray-500">
-                  {cell.label} ({cell.nodeType})
+                <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1.5">
+                  <span className="text-[10px] font-medium text-gray-500">
+                    {cell.label} ({cell.nodeType})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRunCell(index)}
+                    disabled={isRunning}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50"
+                    title="Run up to this cell and propose nodes"
+                  >
+                    <Play size={10} />
+                    Run
+                  </button>
                 </div>
-                <pre className="overflow-x-auto p-2 font-mono text-[11px] leading-snug text-gray-800 whitespace-pre-wrap">
-                  {cell.code}
-                </pre>
+                <div className="overflow-hidden rounded-b-md border-0 border-gray-200">
+                  <Editor
+                    height={Math.min(
+                      Math.max(MIN_EDITOR_HEIGHT, cell.code.split('\n').length * 18),
+                      MAX_EDITOR_HEIGHT
+                    )}
+                    language="python"
+                    value={cell.code}
+                    onChange={(value) => handleCellChange(cell.nodeId, value ?? '')}
+                    theme="vs-light"
+                    options={EDITOR_OPTIONS}
+                  />
+                </div>
               </div>
             ))}
           </div>

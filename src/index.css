@@ -117,12 +117,12 @@ samp {
   box-shadow: none;
 }
 
-/* Marching dots along node perimeter (used by BaseNode SVG) */
+/* Subtle marching dots along node perimeter (used by BaseNode SVG) */
 @keyframes node-selection-perimeter {
   to {
     stroke-dashoffset: -100;
   }
 }
 .node-selection-stroke {
-  animation: node-selection-perimeter 2.5s linear infinite;
+  animation: node-selection-perimeter 3.5s linear infinite;
 }

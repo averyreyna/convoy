@@ -53,6 +53,11 @@ export function generateNodeCode(
 
 // ─── Python (pandas) generators ─────────────────────────────────────────────
 
+/** Escape a string for use inside double-quoted Python string literal (backslash and quote). */
+function pyEscape(s: string): string {
+  return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function generateFilterCode(config: Record<string, unknown>): string {
   const { column, operator, value } = config;
 
@@ -61,8 +66,11 @@ function generateFilterCode(config: Record<string, unknown>): string {
 # df = df[<condition>]`;
   }
 
+  const colEscaped = pyEscape(column);
+  const valueStr = value !== undefined && value !== null ? String(value) : '';
+
   const numValue = Number(value);
-  const isNumeric = value !== '' && !isNaN(numValue);
+  const isNumeric = valueStr !== '' && !isNaN(numValue);
   const opMap: Record<string, string> = {
     eq: '==',
     neq: '!=',
@@ -71,14 +79,14 @@ function generateFilterCode(config: Record<string, unknown>): string {
   };
 
   if (operator === 'contains') {
-    return `df = df[df["${column}"].str.contains("${String(value)}", case=False, na=False)]`;
+    return `df = df[df["${colEscaped}"].str.contains("${pyEscape(valueStr)}", case=False, na=False)]`;
   }
   if (operator === 'startsWith') {
-    return `df = df[df["${column}"].str.startswith("${String(value)}", na=False)]`;
+    return `df = df[df["${colEscaped}"].str.startswith("${pyEscape(valueStr)}", na=False)]`;
   }
   const op = opMap[operator as string] || '==';
-  const fmtVal = isNumeric ? String(numValue) : `"${value}"`;
-  return `df = df[df["${column}"] ${op} ${fmtVal}]`;
+  const fmtVal = isNumeric ? String(numValue) : `"${pyEscape(valueStr)}"`;
+  return `df = df[df["${colEscaped}"] ${op} ${fmtVal}]`;
 }
 
 function generateGroupByCode(config: Record<string, unknown>): string {

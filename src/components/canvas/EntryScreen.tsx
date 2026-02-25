@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileCode, Database, Loader2, X } from 'lucide-react';
+import { FileCode, Database, Loader2, X, Sparkles } from 'lucide-react';
 import { SAMPLE_DATASETS, loadSampleIntoDataSource, type SampleDataset } from '@/lib/sampleData';
 
 interface EntryScreenProps {
@@ -32,34 +32,35 @@ export function EntryScreen({
   };
 
   return (
-    <div className="flex items-center justify-center p-6">
-      <div className={`relative w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-6 shadow-lg ${onDismiss ? 'pt-10' : ''}`}>
+    <div className="flex items-center justify-center p-5">
+      <div className={`relative w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg ${onDismiss ? 'pt-10' : ''}`}>
         {onDismiss && (
           <button
             type="button"
             onClick={onDismiss}
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="absolute right-2.5 top-2.5 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
             title="Dismiss"
             aria-label="Dismiss"
           >
             <X size={18} />
           </button>
         )}
-        <div className="mb-8 text-center">
-          <h1 className="mb-2 text-xl font-semibold text-gray-900">
-            Describe your data or visualization
-          </h1>
-          <p className="text-sm text-gray-500">
-            Start with a sample dataset, or paste code to import a pipeline.
-          </p>
-        </div>
 
-        {/* Sample datasets */}
-        <div className="mb-8">
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400">
-            Use a sample dataset
-          </p>
-          <div className="grid gap-3 sm:grid-cols-3">
+        <div className="mb-1 flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+            <Sparkles size={18} />
+          </span>
+          <h2 className="text-base font-semibold text-gray-900">
+            Data or visualization
+          </h2>
+        </div>
+        <p className="mb-4 text-xs text-gray-500">
+          Choose a sample dataset or import your own, then describe what you want to build.
+        </p>
+
+        {/* Sample datasets — icon-first row */}
+        <div className="mb-4">
+          <div className="flex gap-3">
             {SAMPLE_DATASETS.map((sample) => {
               const isLoading = loadingSampleId === sample.id;
               return (
@@ -68,21 +69,19 @@ export function EntryScreen({
                   type="button"
                   onClick={() => handleSampleClick(sample)}
                   disabled={loadingSampleId != null}
-                  className="flex flex-col items-start rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-md disabled:opacity-60"
+                  title={sample.description}
+                  className="flex flex-1 flex-col items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/80 py-3.5 transition-all hover:border-blue-200 hover:bg-blue-50/50 disabled:opacity-60"
                 >
-                  <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
-                    <Database size={20} className="text-gray-600" />
-                  </div>
-                  <span className="font-medium text-gray-900">{sample.label}</span>
-                  <span className="mt-0.5 line-clamp-2 text-xs text-gray-500">
-                    {sample.description}
+                  <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm">
+                    {isLoading ? (
+                      <Loader2 size={22} className="animate-spin text-blue-600" />
+                    ) : (
+                      <Database size={22} className="text-gray-600" />
+                    )}
                   </span>
-                  {isLoading && (
-                    <span className="mt-2 flex items-center gap-1.5 text-xs text-blue-600">
-                      <Loader2 size={14} className="animate-spin" />
-                      Loading…
-                    </span>
-                  )}
+                  <span className="text-[11px] font-medium text-gray-700 leading-tight">
+                    {sample.label}
+                  </span>
                 </button>
               );
             })}
@@ -90,31 +89,26 @@ export function EntryScreen({
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
             {error}
           </div>
         )}
 
-        {/* Import code */}
-        <div>
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400">
-            Or import code
+        {/* Import — single icon button */}
+        <div className="flex flex-col items-center gap-3 border-t border-gray-100 pt-4">
+          <button
+            type="button"
+            onClick={onOpenImportPython}
+            title="Import from Python"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/50"
+          >
+            <FileCode size={18} className="text-emerald-600" />
+            Python
+          </button>
+          <p className="text-center text-[11px] text-gray-400">
+            We'll add your data to the canvas, then you can describe your goal and we'll build the pipeline.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onOpenImportPython}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/50"
-            >
-              <FileCode size={18} className="text-emerald-600" />
-              Import from Python
-            </button>
-          </div>
         </div>
-
-        <p className="mt-8 text-center text-xs text-gray-400">
-          After choosing a sample, describe what you want and we'll build the pipeline.
-        </p>
       </div>
     </div>
   );

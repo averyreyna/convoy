@@ -36,18 +36,6 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
     [data.chartType, data.xAxis, data.yAxis, data.colorBy]
   );
 
-  // Code view handlers
-  const handleToggleCodeMode = useCallback(() => {
-    updateNode(id, { isCodeMode: !data.isCodeMode });
-  }, [id, data.isCodeMode, updateNode]);
-
-  const handleCodeChange = useCallback(
-    (code: string) => {
-      updateNode(id, { customCode: code, isCodeMode: true });
-    },
-    [id, updateNode]
-  );
-
   const handleOpenPreview = useCallback(() => {
     if (data.xAxis && data.yAxis && chartData.length > 0) {
       setIsPreviewOpen(true);
@@ -71,10 +59,8 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
         onConfirm={() => confirmNode(id)}
         nodeType="chart"
         nodeConfig={explanationConfig}
-        isCodeMode={data.isCodeMode}
         customCode={data.customCode}
-        onToggleCodeMode={handleToggleCodeMode}
-        onCodeChange={handleCodeChange}
+        errorMessage={data.error}
         wide
       >
         <div className="space-y-2">

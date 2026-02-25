@@ -13,7 +13,7 @@ function getPyodide(): Promise<PyodideInstance> {
   if (!pyodidePromise) {
     pyodidePromise = (async () => {
       const p = await loadPyodide({
-        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/',
+        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/',
         fullStdLib: false,
       });
       await p.loadPackage('pandas');
@@ -26,11 +26,16 @@ function getPyodide(): Promise<PyodideInstance> {
 /**
  * Run Python code with input dataframe in scope as `df`.
  * Returns the resulting dataframe (must be named `df` in the Python scope).
+ * If input has no rows, returns empty result with same columns without running Python (avoids KeyError when df has no columns).
  */
 export async function runPythonWithDataFrame(
   input: DataFrame,
   code: string
 ): Promise<DataFrame> {
+  if (!input.rows.length) {
+    return { columns: input.columns, rows: [] };
+  }
+
   const pyodide = await getPyodide();
   if (!pyodide) throw new Error('Pyodide not loaded');
 
@@ -42,15 +47,17 @@ import json
 import pandas as pd
 from js import input_json, user_code
 data = json.loads(input_json)
-df = pd.DataFrame(data["rows"])
+columns = [c["name"] for c in data["columns"]]
+df = pd.DataFrame(data["rows"], columns=columns)
 exec(user_code)
 cols = [{"name": c, "type": "string"} for c in df.columns]
 rows = df.to_dict("records")
-{"columns": cols, "rows": rows}
+_result_ = {"columns": cols, "rows": rows}
+_result_
 `;
 
   const result = await pyodide.runPythonAsync(runScript);
-  if (!result) {
+  if (result === undefined || result === null) {
     throw new Error('Python code did not produce a result');
   }
 
@@ -68,4 +75,25 @@ rows = df.to_dict("records")
     columns,
     rows: output.rows,
   };
+}
+
+/**
+ * Run a full pipeline script in Pyodide (no input dataframe).
+ * The script must create or modify `df` (e.g. via pd.read_csv, transforms).
+ * Used for "Run all" / "Run cell" in the pipeline code panel; the script text
+ * is then sent to import-from-Python to propose nodes.
+ */
+export async function runFullPipelineScript(script: string): Promise<void> {
+  const pyodide = await getPyodide();
+  if (!pyodide) throw new Error('Pyodide not loaded');
+
+  pyodide.globals.set('user_script', script);
+
+  const runScript = `
+import pandas as pd
+from js import user_script
+exec(user_script)
+`;
+
+  await pyodide.runPythonAsync(runScript);
 }

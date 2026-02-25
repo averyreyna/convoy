@@ -204,7 +204,7 @@ print(f"Sorted by ${column}")\n`);
 print(f"Selected ${cols.length} columns")\n`);
       }
     } else if (nodeType === 'transform') {
-      sections.push(`# Custom transform — translate the JavaScript code below to pandas:
+      sections.push(`# Custom transform — translate the custom code below to pandas:
 # ${(data.customCode as string || '// no custom code').split('\n').join('\n# ')}
 # TODO: Implement this transform in Python
 `);
@@ -322,4 +322,26 @@ export function copyAsJupyterCells(nodes: Node[], edges: Edge[]): string {
     parts.push(`# %% ${label}\n${code}\n`);
   }
   return parts.join('\n');
+}
+
+/** Cell code + node type for building a runnable script. */
+export interface CellCode {
+  code: string;
+  nodeType: string;
+}
+
+/**
+ * Build a runnable Python script from an ordered list of cell codes.
+ * Prepends import pandas; optionally limits to cells 0..upToIndex (inclusive) for "Run cell".
+ */
+export function buildScriptFromCellCodes(
+  cells: CellCode[],
+  upToIndex?: number
+): string {
+  if (cells.length === 0) return '';
+  const end = upToIndex !== undefined ? Math.min(upToIndex + 1, cells.length) : cells.length;
+  const slice = cells.slice(0, end);
+  const body = slice.map((c) => c.code.trim()).join('\n\n');
+  const preamble = 'import pandas as pd\n\n';
+  return preamble + body;
 }

@@ -38,18 +38,6 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
   const availableColumns = upstreamData?.columns ?? [];
   const nodeOutput = useDataStore((s) => s.nodeOutputs[id]);
 
-  // Code view handlers
-  const handleToggleCodeMode = useCallback(() => {
-    updateNode(id, { isCodeMode: !data.isCodeMode });
-  }, [id, data.isCodeMode, updateNode]);
-
-  const handleCodeChange = useCallback(
-    (code: string) => {
-      updateNode(id, { customCode: code, isCodeMode: true });
-    },
-    [id, updateNode]
-  );
-
   const toggleColumn = useCallback(
     (columnName: string) => {
       const current = data.columns ?? [];
@@ -83,12 +71,10 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
       onConfirm={() => confirmNode(id)}
       nodeType="select"
       nodeConfig={config}
-      isCodeMode={data.isCodeMode}
+      inputRowCount={data.inputRowCount}
+      outputRowCount={data.outputRowCount}
       customCode={data.customCode}
-      onToggleCodeMode={handleToggleCodeMode}
-      onCodeChange={handleCodeChange}
-      executionError={data.error}
-      upstreamColumns={availableColumns.map((c) => c.name)}
+      errorMessage={data.error}
     >
       <div className="space-y-2">
         <div>

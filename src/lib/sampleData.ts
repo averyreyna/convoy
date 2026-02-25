@@ -70,8 +70,10 @@ export async function loadSampleIntoDataSource(
     },
   });
 
-  const res = await fetch(sample.path);
-  if (!res.ok) throw new Error(`Failed to load sample: ${res.status}`);
+  const base = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '') || '';
+  const url = base + (sample.path.startsWith('/') ? sample.path : `/${sample.path}`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load sample: ${res.status} ${res.statusText}`);
   const csvText = await res.text();
 
   return new Promise((resolve, reject) => {

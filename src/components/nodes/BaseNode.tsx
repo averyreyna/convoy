@@ -6,7 +6,6 @@ import { ChevronDown, ChevronRight, GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { ExplanationPopover } from './ExplanationPopover';
-import { CodeView } from './CodeView';
 
 export type NodeState = 'proposed' | 'confirmed' | 'running' | 'error';
 
@@ -28,22 +27,12 @@ interface BaseNodeProps {
   inputRowCount?: number;
   /** Output row count for AI explanation context */
   outputRowCount?: number;
-  /** Whether the node is currently in code mode */
-  isCodeMode?: boolean;
-  /** User's custom code (if they've edited the generated code) */
+  /** User's custom code (for inline diff baseline comparison; editing is in pipeline code view) */
   customCode?: string;
-  /** Called when toggling between Simple and Code view */
-  onToggleCodeMode?: () => void;
-  /** Called when the user edits code in the editor */
-  onCodeChange?: (code: string) => void;
-  /** If true, the node is code-only (no simple view). Used for Transform node. */
-  codeOnly?: boolean;
   /** If true, the node uses a wider layout (e.g. for chart rendering). */
   wide?: boolean;
-  /** Execution error message to show in the code editor */
-  executionError?: string;
-  /** Upstream column names for autocomplete in the code editor */
-  upstreamColumns?: string[];
+  /** Execution error message to show when state is 'error' */
+  errorMessage?: string;
   /** Whether the node is selected on the canvas */
   selected?: boolean;
 }
@@ -71,14 +60,9 @@ export const BaseNode = memo(function BaseNode({
   nodeConfig,
   inputRowCount,
   outputRowCount,
-  isCodeMode,
   customCode,
-  onToggleCodeMode,
-  onCodeChange,
-  codeOnly,
   wide,
-  executionError,
-  upstreamColumns,
+  errorMessage,
   selected,
 }: BaseNodeProps) {
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
@@ -106,13 +90,6 @@ export const BaseNode = memo(function BaseNode({
   }, [hasInlineDiff, codeChanged, baseline, customCode]);
 
   const showExplanation = state === 'confirmed' && nodeType && nodeConfig;
-  // Allow code view when confirmed or when in error so the user can edit and recompile
-  const showCodeToggle =
-    (state === 'confirmed' || state === 'error') &&
-    nodeType &&
-    nodeConfig &&
-    onToggleCodeMode &&
-    onCodeChange;
 
   return (
     <div
@@ -127,7 +104,7 @@ export const BaseNode = memo(function BaseNode({
         }
       )}
     >
-      {/* Selected: dark purple dotted stroke traveling around perimeter */}
+      {/* Selected: subtle blue outline (design-language blue) */}
       {selected && (
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
@@ -139,8 +116,8 @@ export const BaseNode = memo(function BaseNode({
             d={ROUNDED_RECT_PATH}
             pathLength={100}
             fill="none"
-            stroke="#4c1d95"
-            strokeWidth="2"
+            stroke="#3b82f6"
+            strokeWidth="1.5"
             strokeDasharray="6 94"
             strokeLinecap="round"
             className="node-selection-stroke"
@@ -183,42 +160,14 @@ export const BaseNode = memo(function BaseNode({
         </div>
       </div>
 
-      {/* Content: simple controls or code view */}
+      {/* Content: config/simple view only; code editing is in the pipeline code view */}
       <div className="p-3">
-        {showCodeToggle && !codeOnly ? (
-          <>
-            {/* Simple controls (hidden when code mode active) */}
-            {!isCodeMode && children}
-
-            {/* Code view toggle + editor */}
-            <CodeView
-              nodeType={nodeType}
-              config={nodeConfig}
-              isCodeMode={!!isCodeMode}
-              customCode={customCode}
-              onToggleMode={onToggleCodeMode}
-              onCodeChange={onCodeChange}
-              executionError={executionError}
-              upstreamColumns={upstreamColumns}
-            />
-          </>
-        ) : codeOnly && showCodeToggle ? (
-          /* Code-only node (Transform) */
-          <CodeView
-            nodeType={nodeType}
-            config={nodeConfig}
-            isCodeMode={true}
-            customCode={customCode}
-            onToggleMode={onToggleCodeMode}
-            onCodeChange={onCodeChange}
-            codeOnly
-            executionError={executionError}
-            upstreamColumns={upstreamColumns}
-          />
-        ) : (
-          /* No code toggle available — just show children */
-          children
+        {state === 'error' && errorMessage && (
+          <div className="mb-2 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700">
+            {errorMessage}
+          </div>
         )}
+        {children}
       </div>
 
       {/* Confirm button for proposed nodes */}

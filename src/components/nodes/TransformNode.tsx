@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { Code2 } from 'lucide-react';
 import { BaseNode } from './BaseNode';
@@ -54,18 +54,6 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
 
   const nodeOutput = useDataStore((s) => s.nodeOutputs[id]);
 
-  // Code view handlers
-  const handleToggleCodeMode = useCallback(() => {
-    // Transform is always in code mode — no-op
-  }, []);
-
-  const handleCodeChange = useCallback(
-    (code: string) => {
-      updateNode(id, { customCode: code, isCodeMode: true });
-    },
-    [id, updateNode]
-  );
-
   return (
     <BaseNode
       nodeId={id}
@@ -80,16 +68,13 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
       nodeConfig={config}
       inputRowCount={data.inputRowCount}
       outputRowCount={data.outputRowCount}
-      isCodeMode={true}
       customCode={code}
-      onToggleCodeMode={handleToggleCodeMode}
-      onCodeChange={handleCodeChange}
-      codeOnly
-      executionError={data.error}
-      upstreamColumns={(upstreamData?.columns ?? []).map((c) => c.name)}
+      errorMessage={data.error}
     >
-      {/* Children not shown for code-only nodes */}
-      <div className="space-y-1">
+      <div className="space-y-2">
+        <p className="text-[10px] text-gray-500">
+          Edit code in the pipeline view (right panel).
+        </p>
         {data.inputRowCount !== undefined && (
           <div className="flex items-center justify-between rounded-md bg-gray-50 px-2 py-1 text-[10px] text-gray-500">
             <span>{data.inputRowCount.toLocaleString()} rows in</span>
@@ -102,11 +87,6 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
         {!upstreamData && data.state === 'confirmed' && (
           <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
             Connect a data source to process data
-          </div>
-        )}
-        {data.error && (
-          <div className="rounded-md bg-red-50 px-2 py-1 text-[10px] text-red-600">
-            {data.error}
           </div>
         )}
 

@@ -14,7 +14,7 @@ import type { DataFrame } from '@/types';
  * - The node config or custom code changes
  *
  * When customCode is provided it takes priority over config-based execution
- * and is run through the sandboxed Function executor.
+ * and is run through the Python runner (Pyodide).
  *
  * Stores the result in the data store and updates row counts on the node.
  */
