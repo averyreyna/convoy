@@ -43,10 +43,6 @@ function configSnapshot(c: Record<string, unknown> | undefined): string {
   return JSON.stringify(keys.map((k) => [k, c[k]]));
 }
 
-/* Rounded rect path (inset by 2px) for perimeter stroke; pathLength=100 for dashoffset animation */
-const ROUNDED_RECT_PATH =
-  'M 10 2 L 90 2 Q 98 2 98 10 L 98 90 Q 98 98 90 98 L 10 98 Q 2 98 2 90 L 2 10 Q 2 2 10 2';
-
 export const BaseNode = memo(function BaseNode({
   nodeId,
   state,
@@ -101,30 +97,10 @@ export const BaseNode = memo(function BaseNode({
           'border-solid border-gray-200': state === 'confirmed',
           'border-solid border-red-400 shadow-red-100': state === 'error',
           'animate-pulse border-blue-400 shadow-blue-100': state === 'running',
+          'border-blue-200 bg-blue-50/50 ring-1 ring-blue-100': selected,
         }
       )}
     >
-      {/* Selected: subtle blue outline (design-language blue) */}
-      {selected && (
-        <svg
-          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <path
-            d={ROUNDED_RECT_PATH}
-            pathLength={100}
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="1.5"
-            strokeDasharray="6 94"
-            strokeLinecap="round"
-            className="node-selection-stroke"
-          />
-        </svg>
-      )}
-
       {/* Input handle */}
       {inputs > 0 && (
         <Handle

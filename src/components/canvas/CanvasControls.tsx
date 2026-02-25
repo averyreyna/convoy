@@ -37,7 +37,6 @@ export function CanvasControls() {
 
   const hasNodes = nodes.length > 0;
 
-  // Close menu on outside click
   useEffect(() => {
     if (!showExportMenu) return;
     const handleClick = (e: MouseEvent) => {
@@ -49,7 +48,6 @@ export function CanvasControls() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showExportMenu]);
 
-  // Close Edit with AI modal on Escape
   useEffect(() => {
     if (!showEditWithAIModal) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,7 +57,7 @@ export function CanvasControls() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showEditWithAIModal]);
 
-  // When code panel focuses a cell, snap canvas viewport to that node
+  // when a code cell is focused, snap canvas viewport to that node
   useEffect(() => {
     if (!focusNodeIdForView) return;
     fitView({
@@ -121,7 +119,6 @@ export function CanvasControls() {
 
   return (
     <>
-      {/* Edit with AI floating bar — visible when one or more nodes selected */}
       {selectedCount > 0 && (
         <Panel position="top-center" className="mt-2">
           <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
@@ -153,7 +150,6 @@ export function CanvasControls() {
       )}
 
       <Panel position="bottom-right" className="flex gap-1">
-        {/* Export button — always visible so "Code changes" and import are findable */}
         <div ref={menuRef} className="relative">
           <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
             <button
@@ -167,7 +163,6 @@ export function CanvasControls() {
             </button>
           </div>
 
-          {/* Export dropdown menu */}
           {showExportMenu && (
             <div className="absolute bottom-full right-0 mb-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
               <button
@@ -225,7 +220,6 @@ export function CanvasControls() {
           )}
         </div>
 
-        {/* Zoom / view controls */}
         <div className="flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
           <button
             onClick={() => zoomIn({ duration: 200 })}
@@ -263,13 +257,11 @@ export function CanvasControls() {
         </div>
       </Panel>
 
-      {/* Script diff / Code changes modal */}
       <ScriptDiffModal
         isOpen={showDiffModal}
         onClose={() => setShowDiffModal(false)}
       />
 
-      {/* Edit with AI modal */}
       {showEditWithAIModal && (
         <div
           className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/20 backdrop-blur-sm"

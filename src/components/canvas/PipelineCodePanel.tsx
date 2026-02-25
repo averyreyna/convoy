@@ -13,17 +13,17 @@ import {
 } from '@/lib/exportPipeline';
 import { runFullPipelineScript } from '@/lib/pythonRunner';
 import { importPipelineFromPython } from '@/lib/api';
-import { Copy, Download, FileCode, Play, Square, X } from 'lucide-react';
+import { Copy, Download, FileCode, Play, Plus, Square, X } from 'lucide-react';
 
 const EDITOR_OPTIONS = {
   readOnly: false,
   minimap: { enabled: false },
-  fontSize: 11,
+  fontSize: 10,
   lineNumbers: 'off' as const,
   folding: false,
   scrollBeyondLastLine: false,
   automaticLayout: true,
-  padding: { top: 6, bottom: 6 },
+  padding: { top: 4, bottom: 4 },
   wordWrap: 'on' as const,
   overviewRulerLanes: 0,
   hideCursorInOverviewRuler: true,
@@ -34,29 +34,43 @@ const EDITOR_OPTIONS = {
   },
 };
 
-const MIN_EDITOR_HEIGHT = 60;
-const MAX_EDITOR_HEIGHT = 200;
+const MIN_EDITOR_HEIGHT = 52;
+const MAX_EDITOR_HEIGHT = 168;
+
+const DEFAULT_DRAFT_CODE = '# New step\ndf = df  # edit and run';
 
 export function PipelineCodePanel() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const applyImportToExistingPipeline = useCanvasStore((s) => s.applyImportToExistingPipeline);
   const setPipelineFromImport = useCanvasStore((s) => s.setPipelineFromImport);
   const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
 
   const [runError, setRunError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [focusedCellNodeId, setFocusedCellNodeId] = useState<string | null>(null);
+  const [draftCells, setDraftCells] = useState<Array<{ id: string; code: string }>>([]);
+  const [copyFeedback, setCopyFeedback] = useState<'script' | 'jupyter' | null>(null);
 
   const activateCell = useCallback(
     (nodeId: string) => {
       setFocusedCellNodeId(nodeId);
-      setFocusNodeIdForView(nodeId);
+      if (!nodeId.startsWith('draft-')) {
+        setFocusNodeIdForView(nodeId);
+      }
     },
     [setFocusNodeIdForView]
   );
 
-  const cells = useMemo(() => {
+  const handleAddCell = useCallback(() => {
+    setDraftCells((prev) => [
+      ...prev,
+      { id: `draft-${Date.now()}`, code: DEFAULT_DRAFT_CODE },
+    ]);
+  }, []);
+
+  const nodeCells = useMemo(() => {
     const sorted = topologicalSort(nodes, edges);
     return sorted.map((node) => {
       const data = node.data as Record<string, unknown>;
@@ -78,9 +92,19 @@ export function PipelineCodePanel() {
     });
   }, [nodes, edges]);
 
+  const cells = useMemo(() => {
+    const draftAsCells = draftCells.map((d) => ({
+      nodeId: d.id,
+      nodeType: 'transform' as const,
+      label: 'New cell',
+      code: d.code,
+    }));
+    return [...nodeCells, ...draftAsCells];
+  }, [nodeCells, draftCells]);
+
   const fullScript = useMemo(
-    () => (nodes.length > 0 ? exportAsPython(nodes, edges) : ''),
-    [nodes, edges]
+    () => (cells.length > 0 ? buildScriptFromCellCodes(cells) : ''),
+    [cells]
   );
 
   const dataSourceColumnNames = useMemo(() => {
@@ -91,13 +115,28 @@ export function PipelineCodePanel() {
   }, [nodes, edges]);
 
   const runScriptAndImport = useCallback(
-    async (scriptForImport: string, scriptForRun: string) => {
+    async (
+      scriptForImport: string,
+      scriptForRun: string,
+      options?: { upToIndex?: number; clearDraftsOnSuccess?: boolean }
+    ) => {
       setRunError(null);
       setIsRunning(true);
       try {
         await runFullPipelineScript(scriptForRun);
         const { pipeline } = await importPipelineFromPython(scriptForImport);
-        setPipelineFromImport(pipeline);
+        if (nodes.length === 0) {
+          setPipelineFromImport(pipeline);
+          setDraftCells([]);
+        } else {
+          applyImportToExistingPipeline(
+            pipeline,
+            options?.upToIndex !== undefined ? { upToIndex: options.upToIndex } : undefined
+          );
+          if (options?.clearDraftsOnSuccess && draftCells.length > 0) {
+            setDraftCells([]);
+          }
+        }
       } catch (err: unknown) {
         const msg =
           err instanceof Error
@@ -110,75 +149,110 @@ export function PipelineCodePanel() {
         setIsRunning(false);
       }
     },
-    [setPipelineFromImport]
+    [applyImportToExistingPipeline, setPipelineFromImport, nodes.length, draftCells.length]
   );
 
   const handleRunAll = useCallback(() => {
     if (cells.length === 0) return;
     const scriptForImport = buildScriptFromCellCodes(cells);
     const scriptForRun = buildScriptForBrowserRun(cells, undefined, dataSourceColumnNames);
-    runScriptAndImport(scriptForImport, scriptForRun);
-  }, [cells, dataSourceColumnNames, runScriptAndImport]);
+    runScriptAndImport(scriptForImport, scriptForRun, {
+      clearDraftsOnSuccess: draftCells.length > 0,
+    });
+  }, [cells, dataSourceColumnNames, runScriptAndImport, draftCells.length]);
 
   const handleRunCell = useCallback(
     (cellIndex: number) => {
       const scriptForImport = buildScriptFromCellCodes(cells, cellIndex);
       const scriptForRun = buildScriptForBrowserRun(cells, cellIndex, dataSourceColumnNames);
-      runScriptAndImport(scriptForImport, scriptForRun);
+      const runIncludesDrafts = cellIndex >= nodeCells.length;
+      runScriptAndImport(scriptForImport, scriptForRun, {
+        upToIndex: runIncludesDrafts ? undefined : cellIndex,
+        clearDraftsOnSuccess: runIncludesDrafts,
+      });
     },
-    [cells, dataSourceColumnNames, runScriptAndImport]
+    [cells, nodeCells.length, dataSourceColumnNames, runScriptAndImport]
   );
 
   const handleCellChange = useCallback(
     (nodeId: string, value: string) => {
-      updateNode(nodeId, { customCode: value || undefined });
+      if (nodeId.startsWith('draft-')) {
+        setDraftCells((prev) =>
+          prev.map((d) => (d.id === nodeId ? { ...d, code: value } : d))
+        );
+      } else {
+        updateNode(nodeId, { customCode: value || undefined });
+      }
     },
     [updateNode]
   );
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     if (!fullScript) return;
     try {
       await navigator.clipboard.writeText(fullScript);
+      setCopyFeedback('script');
+      setTimeout(() => setCopyFeedback(null), 1500);
     } catch {
       // ignore
     }
-  };
+  }, [fullScript]);
 
-  const handleDownloadPy = () => {
-    downloadPipelineScript(nodes, edges);
-  };
+  const handleDownloadPy = useCallback(() => {
+    if (draftCells.length > 0) {
+      const script = buildScriptFromCellCodes(cells);
+      const blob = new Blob([script], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `convoy-pipeline-${Date.now()}.py`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      downloadPipelineScript(nodes, edges);
+    }
+  }, [cells, draftCells.length, nodes, edges]);
 
-  const handleDownloadNotebook = () => {
+  const handleDownloadNotebook = useCallback(() => {
     downloadNotebook(nodes, edges);
-  };
+  }, [nodes, edges]);
 
-  const handleCopyJupyterCells = async () => {
-    const text = copyAsJupyterCells(nodes, edges);
+  const handleCopyJupyterCells = useCallback(async () => {
+    const text =
+      draftCells.length > 0
+        ? cells
+            .map(
+              (c, i) =>
+                `${i === 0 ? '# %%\nimport pandas as pd\n\n' : ''}# %% ${c.label}\n${c.code}\n`
+            )
+            .join('\n')
+        : copyAsJupyterCells(nodes, edges);
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
+      setCopyFeedback('jupyter');
+      setTimeout(() => setCopyFeedback(null), 1500);
     } catch {
       // ignore
     }
-  };
+  }, [cells, draftCells.length, nodes, edges]);
 
   return (
     <div className="flex h-full flex-col border-l border-gray-200 bg-white">
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-3 py-2">
-        <span className="text-xs font-semibold text-gray-700">Pipeline code</span>
-        <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-2 py-1.5">
+        <span className="text-[11px] font-semibold text-gray-700">Pipeline code</span>
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={handleRunAll}
             disabled={cells.length === 0 || isRunning}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
             title="Run all cells and propose nodes"
           >
             {isRunning ? (
-              <Square size={12} className="animate-pulse" />
+              <Square size={11} className="animate-pulse" />
             ) : (
-              <Play size={12} />
+              <Play size={11} />
             )}
             Run all
           </button>
@@ -186,43 +260,57 @@ export function PipelineCodePanel() {
             type="button"
             onClick={handleCopy}
             disabled={!fullScript}
-            className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-            title="Copy Python script"
+            className="flex items-center gap-0.5 rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            title={copyFeedback === 'script' ? 'Copied' : 'Copy Python script'}
           >
-            <Copy size={14} />
+            <Copy size={13} />
+            {copyFeedback === 'script' && (
+              <span className="text-[9px] font-medium text-emerald-600">Copied</span>
+            )}
           </button>
           <button
             type="button"
             onClick={handleCopyJupyterCells}
-            disabled={nodes.length === 0}
-            className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-            title="Copy as Jupyter cells"
+            disabled={cells.length === 0}
+            className="flex items-center gap-0.5 rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            title={copyFeedback === 'jupyter' ? 'Copied' : 'Copy as Jupyter cells'}
           >
-            <FileCode size={14} />
+            <FileCode size={13} />
+            {copyFeedback === 'jupyter' && (
+              <span className="text-[9px] font-medium text-emerald-600">Copied</span>
+            )}
           </button>
           <button
             type="button"
             onClick={handleDownloadPy}
-            disabled={nodes.length === 0}
-            className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            disabled={cells.length === 0}
+            className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
             title="Download as .py"
           >
-            <Download size={14} />
+            <Download size={13} />
           </button>
           <button
             type="button"
             onClick={handleDownloadNotebook}
             disabled={nodes.length === 0}
-            className="rounded px-1.5 py-1.5 text-[10px] font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            className="rounded px-1 py-1 text-[10px] font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
             title="Download as .ipynb"
           >
             .ipynb
+          </button>
+          <button
+            type="button"
+            onClick={handleAddCell}
+            className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            title="Add new cell (run to create suggested node)"
+          >
+            <Plus size={13} />
           </button>
         </div>
       </div>
 
       {runError && (
-        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-red-100 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-red-100 bg-red-50 px-2 py-1.5 text-[11px] text-red-700">
           <span className="min-w-0 flex-1 break-words">{runError}</span>
           <button
             type="button"
@@ -236,11 +324,13 @@ export function PipelineCodePanel() {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto p-1.5">
         {cells.length === 0 ? (
-          <p className="text-xs text-gray-400">Add nodes to see pipeline code.</p>
+          <p className="text-[11px] text-gray-400">
+            Add nodes to see pipeline code, or use + to add a new cell.
+          </p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {cells.map((cell, index) => (
               <div
                 key={cell.nodeId}
@@ -253,7 +343,7 @@ export function PipelineCodePanel() {
                     : 'border-gray-100 bg-gray-50/80'
                 }`}
               >
-                <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1.5">
+                <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1">
                   <span className="text-[10px] font-medium text-gray-500">
                     {cell.label} ({cell.nodeType})
                   </span>
@@ -274,7 +364,7 @@ export function PipelineCodePanel() {
                 <div className="overflow-hidden rounded-b-md border-0 border-gray-200">
                   <Editor
                     height={Math.min(
-                      Math.max(MIN_EDITOR_HEIGHT, cell.code.split('\n').length * 18),
+                      Math.max(MIN_EDITOR_HEIGHT, cell.code.split('\n').length * 16),
                       MAX_EDITOR_HEIGHT
                     )}
                     language="python"

@@ -10,7 +10,13 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import type { ProposedPipeline } from '@/types';
+import { topologicalSort } from '@/lib/exportPipeline';
 import { usePreferencesStore } from './preferencesStore';
+
+export interface ApplyImportOptions {
+  /** When set (Run cell at index K), only update existing nodes at indices 0..K. */
+  upToIndex?: number;
+}
 
 export type BaselineLanguage = 'python';
 
@@ -23,9 +29,6 @@ interface CanvasStore {
 
   showPrompt: boolean;
   setShowPrompt: (show: boolean) => void;
-
-  welcomeCardDismissed: boolean;
-  dismissWelcomeCard: () => void;
 
   // Baseline (for diff viewer): set on import or "Pin current"
   baselineCode: string | null;
@@ -53,6 +56,7 @@ interface CanvasStore {
   // Pipeline operations
   addProposedPipeline: (pipeline: ProposedPipeline) => void;
   setPipelineFromImport: (pipeline: ProposedPipeline) => void;
+  applyImportToExistingPipeline: (pipeline: ProposedPipeline, options?: ApplyImportOptions) => void;
   confirmAllProposed: () => void;
   clearProposed: () => void;
 
@@ -75,9 +79,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   showPrompt: false,
   setShowPrompt: (show) => set({ showPrompt: show }),
-
-  welcomeCardDismissed: false,
-  dismissWelcomeCard: () => set({ welcomeCardDismissed: true }),
 
   baselineCode: null,
   baselineLanguage: null,
@@ -300,6 +301,93 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       nodes: [...existingNodes, ...newNodes],
       edges: [...existingEdges, ...newEdges],
     });
+  },
+
+  applyImportToExistingPipeline: (pipeline, options) => {
+    const { nodes: existingNodes, edges: existingEdges } = get();
+    const pipelineNodes = pipeline.nodes || [];
+    if (pipelineNodes.length === 0) return;
+
+    const orderedNodes = topologicalSort(existingNodes, existingEdges);
+    if (orderedNodes.length === 0) return;
+
+    const upToIndex = options?.upToIndex;
+    const updateLimit =
+      upToIndex !== undefined
+        ? Math.min(pipelineNodes.length, orderedNodes.length, upToIndex + 1)
+        : Math.min(pipelineNodes.length, orderedNodes.length);
+
+    const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
+
+    const updatedNodes = existingNodes.map((node) => {
+      const idx = orderedNodes.findIndex((n) => n.id === node.id);
+      if (idx < 0 || idx >= updateLimit) return node;
+      const imp = pipelineNodes[idx];
+      const type = imp.type;
+      const config = (imp.config || {}) as Record<string, unknown>;
+      const supportsCodeMode = type !== 'dataSource' && type !== 'transform';
+      const data = { ...node.data, ...config } as Record<string, unknown>;
+      if ((node.data as Record<string, unknown>)?.state !== undefined)
+        data.state = (node.data as Record<string, unknown>).state;
+      if ((node.data as Record<string, unknown>)?.label !== undefined)
+        data.label = (node.data as Record<string, unknown>).label;
+      if ((node.data as Record<string, unknown>)?.isCodeMode !== undefined)
+        data.isCodeMode = (node.data as Record<string, unknown>).isCodeMode;
+      if (data.label === undefined)
+        data.label = type.charAt(0).toUpperCase() + type.slice(1);
+      if (data.isCodeMode === undefined && supportsCodeMode)
+        data.isCodeMode = showCodeByDefault;
+      return { ...node, type, data };
+    });
+
+    if (
+      upToIndex === undefined &&
+      pipelineNodes.length > orderedNodes.length
+    ) {
+      const lastNode = orderedNodes[orderedNodes.length - 1];
+      let xOffset = lastNode.position.x + 320;
+      const yPos = lastNode.position.y;
+      let previousNodeId = lastNode.id;
+      const timestamp = Date.now();
+      const appendNodes: Node[] = [];
+      const appendEdges: Edge[] = [];
+      const toAdd = pipelineNodes.slice(orderedNodes.length);
+
+      toAdd.forEach((nodeConfig, index) => {
+        const nodeId = `import-${timestamp}-${index}`;
+        const type = nodeConfig.type;
+        const supportsCodeMode =
+          type !== 'dataSource' && type !== 'transform';
+        appendNodes.push({
+          id: nodeId,
+          type,
+          position: { x: xOffset, y: yPos },
+          data: {
+            state: 'proposed' as const,
+            label: type.charAt(0).toUpperCase() + type.slice(1),
+            ...nodeConfig.config,
+            ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
+          },
+        });
+        appendEdges.push({
+          id: `edge-${previousNodeId}-${nodeId}`,
+          source: previousNodeId,
+          target: nodeId,
+          type: 'dataFlow',
+          animated: true,
+          style: { opacity: 0.5 },
+        });
+        previousNodeId = nodeId;
+        xOffset += 320;
+      });
+
+      set({
+        nodes: [...updatedNodes, ...appendNodes],
+        edges: [...existingEdges, ...appendEdges],
+      });
+    } else {
+      set({ nodes: updatedNodes });
+    }
   },
 
   confirmAllProposed: () =>

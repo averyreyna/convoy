@@ -5,7 +5,7 @@ export function SidebarHeader() {
         <div>
           <h2 className="text-lg font-semibold text-gray-800">Convoy</h2>
           <p className="mt-0.5 text-xs text-gray-400">
-            Drag nodes onto the canvas
+            Click a node type to add it to the canvas
           </p>
         </div>
       </div>

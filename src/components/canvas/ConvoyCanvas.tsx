@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -9,21 +9,12 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { useCanvasStore } from '@/stores/canvasStore';
-import { usePreferencesStore } from '@/stores/preferencesStore';
 import { nodeTypes } from '@/components/nodes';
 import { edgeTypes } from '@/components/edges';
 import { CanvasControls } from './CanvasControls';
-import { nodeTypeInfos } from '@/components/nodes';
 import { PipelinePrompt } from './PipelinePrompt';
 import { ImportFromPythonModal } from './ImportFromPythonModal';
 import { ProposedPipelineBanner } from './ProposedPipelineBanner';
-import { EntryScreen } from './EntryScreen';
-
-let nodeIdCounter = 0;
-function getNextNodeId() {
-  nodeIdCounter += 1;
-  return `node-${nodeIdCounter}`;
-}
 
 export function ConvoyCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -36,53 +27,9 @@ export function ConvoyCanvas() {
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const welcomeCardDismissed = useCanvasStore((s) => s.welcomeCardDismissed);
-  const dismissWelcomeCard = useCanvasStore((s) => s.dismissWelcomeCard);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const showCodeByDefault = usePreferencesStore((s) => s.showCodeByDefault);
-
-  const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const onDrop = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-
-      const type = event.dataTransfer.getData('application/reactflow');
-      if (!type || !reactFlowInstance.current) return;
-
-      const nodeInfo = nodeTypeInfos.find((n) => n.type === type);
-      if (!nodeInfo) return;
-
-      // Get the position where the node was dropped
-      const position = reactFlowInstance.current.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-
-      const supportsCodeMode =
-        type !== 'dataSource' && type !== 'transform';
-      const newNode = {
-        id: getNextNodeId(),
-        type,
-        position,
-        data: {
-          ...nodeInfo.defaultData,
-          ...(supportsCodeMode
-            ? { isCodeMode: showCodeByDefault }
-            : {}),
-        },
-      };
-
-      addNode(newNode);
-    },
-    [addNode, showCodeByDefault]
-  );
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstance.current = instance;
@@ -97,8 +44,6 @@ export function ConvoyCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onInit={onInit}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{
@@ -149,16 +94,6 @@ export function ConvoyCanvas() {
       {/* Import from Python modal */}
       {showImportModal && (
         <ImportFromPythonModal onClose={() => setShowImportModal(false)} />
-      )}
-
-      {/* Welcome card on canvas when empty — user can dismiss if they don't need it */}
-      {nodes.length === 0 && !welcomeCardDismissed && !showImportModal && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center">
-          <EntryScreen
-            onOpenImportPython={() => setShowImportModal(true)}
-            onDismiss={dismissWelcomeCard}
-          />
-        </div>
       )}
     </div>
   );
