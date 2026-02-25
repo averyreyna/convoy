@@ -45,7 +45,6 @@ export async function runPythonWithDataFrame(
   const runScript = `
 import json
 import pandas as pd
-from js import input_json, user_code
 data = json.loads(input_json)
 columns = [c["name"] for c in data["columns"]]
 df = pd.DataFrame(data["rows"], columns=columns)
@@ -91,9 +90,19 @@ export async function runFullPipelineScript(script: string): Promise<void> {
 
   const runScript = `
 import pandas as pd
-from js import user_script
 exec(user_script)
 `;
 
-  await pyodide.runPythonAsync(runScript);
+  try {
+    await pyodide.runPythonAsync(runScript);
+  } catch (err: unknown) {
+    // Pyodide throws JS errors whose message often contains the full Python traceback
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : String(err);
+    throw new Error(message);
+  }
 }

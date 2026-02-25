@@ -3,14 +3,12 @@ import { FileCode, Database, Loader2, X, Sparkles } from 'lucide-react';
 import { SAMPLE_DATASETS, loadSampleIntoDataSource, type SampleDataset } from '@/lib/sampleData';
 
 interface EntryScreenProps {
-  onOpenPrompt: () => void;
   onOpenImportPython: () => void;
   /** When provided, the card is shown on the canvas and can be dismissed (close button). */
   onDismiss?: () => void;
 }
 
 export function EntryScreen({
-  onOpenPrompt,
   onOpenImportPython,
   onDismiss,
 }: EntryScreenProps) {
@@ -23,7 +21,6 @@ export function EntryScreen({
     const nodeId = `entry-${Date.now()}`;
     try {
       await loadSampleIntoDataSource(nodeId, sample);
-      onOpenPrompt();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sample');
     } finally {

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { ChevronLeft, ChevronRight, Code2, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Code2, Globe, Sparkles } from 'lucide-react';
+import { useCanvasStore } from '@/stores/canvasStore';
 import { ConvoyCanvas } from '@/components/canvas/ConvoyCanvas';
 import { NodePalette } from '@/components/canvas/NodePalette';
 import { SidebarHeader } from '@/components/canvas/SidebarHeader';
@@ -13,6 +14,7 @@ const DEFAULT_CODE_PCT = 38;
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [codeEditorOpen, setCodeEditorOpen] = useState(true);
+  const setShowPrompt = useCanvasStore((s) => s.setShowPrompt);
   const [codePanelPct, setCodePanelPct] = useState(DEFAULT_CODE_PCT);
   const isDragging = useRef(false);
 
@@ -95,11 +97,50 @@ export default function App() {
         </button>
 
         <div className="relative flex flex-1 min-w-0" style={{ marginLeft: 0 }}>
+          {/* Canvas column: toolbar buttons are positioned relative to this so they track code view toggle */}
           <div
-            className="min-h-0 min-w-0 shrink-0 transition-[width] duration-300 ease-in-out"
+            className="relative min-h-0 min-w-0 shrink-0 transition-[width] duration-300 ease-in-out"
             style={{ width: codeEditorOpen ? `${canvasPct}%` : '100%' }}
           >
             <ConvoyCanvas />
+            {/* Bottom toolbar: centered in canvas area; spacing updates when code panel opens/closes */}
+            <button
+              type="button"
+              onClick={() => setShowPrompt(true)}
+              className="absolute bottom-5 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center gap-2 rounded-lg border border-gray-300 bg-gray-800 px-4 shadow-md hover:border-gray-400 hover:bg-gray-700"
+              title="Describe what you want to visualize"
+              aria-label="Describe what you want to visualize"
+            >
+              <Sparkles size={16} className="text-amber-300" />
+              <span className="text-sm font-medium text-white">Describe</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCodeEditorOpen((v) => !v)}
+              className="absolute bottom-5 left-5 z-30 flex h-9 w-[72px] items-stretch overflow-hidden rounded-lg border border-gray-300 bg-gray-800 shadow-md hover:border-gray-400"
+              title={codeEditorOpen ? 'Close Editor (E)' : 'Open Editor (E)'}
+              aria-label={codeEditorOpen ? 'Close Editor' : 'Open Editor'}
+            >
+              {/* Inactive icons (gray) — full width track */}
+              <span className="flex w-1/2 items-center justify-center text-gray-400" aria-hidden>
+                <Code2 size={16} />
+              </span>
+              <span className="flex w-1/2 items-center justify-center text-gray-400" aria-hidden>
+                <Globe size={16} />
+              </span>
+              {/* Sliding blue thumb with white icons — same duration as sidebar */}
+              <span
+                className="absolute inset-y-0 flex w-1/2 items-center justify-center bg-blue-500 text-white transition-[left] duration-300 ease-in-out"
+                style={{ left: codeEditorOpen ? 0 : '50%' }}
+                aria-hidden
+              >
+                {codeEditorOpen ? (
+                  <Code2 size={16} />
+                ) : (
+                  <Globe size={16} />
+                )}
+              </span>
+            </button>
           </div>
           {codeEditorOpen && (
             <div
@@ -126,35 +167,6 @@ export default function App() {
               <PipelineCodePanel />
             </div>
           </div>
-
-          {/* Code editor toggle — sliding thumb like reference; panel uses same slide animation as node sidebar */}
-          <button
-            type="button"
-            onClick={() => setCodeEditorOpen((v) => !v)}
-            className="absolute bottom-5 left-5 z-30 flex h-9 w-[72px] items-stretch overflow-hidden rounded-lg border border-gray-300 bg-gray-800 shadow-md hover:border-gray-400"
-            title={codeEditorOpen ? 'Close Editor (E)' : 'Open Editor (E)'}
-            aria-label={codeEditorOpen ? 'Close Editor' : 'Open Editor'}
-          >
-            {/* Inactive icons (gray) — full width track */}
-            <span className="flex w-1/2 items-center justify-center text-gray-400" aria-hidden>
-              <Code2 size={16} />
-            </span>
-            <span className="flex w-1/2 items-center justify-center text-gray-400" aria-hidden>
-              <Globe size={16} />
-            </span>
-            {/* Sliding blue thumb with white icons — same duration as sidebar */}
-            <span
-              className="absolute inset-y-0 flex w-1/2 items-center justify-center bg-blue-500 text-white transition-[left] duration-300 ease-in-out"
-              style={{ left: codeEditorOpen ? 0 : '50%' }}
-              aria-hidden
-            >
-              {codeEditorOpen ? (
-                <Code2 size={16} />
-              ) : (
-                <Globe size={16} />
-              )}
-            </span>
-          </button>
         </div>
       </ReactFlowProvider>
     </div>

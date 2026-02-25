@@ -24,7 +24,7 @@ Rules:
 - Only include node IDs that were in the selected list.
 - For each node, include only the keys that should change (config and/or customCode). Omit a node if no change.
 - config must be a valid partial or full config for that node type (filter, groupBy, sort, select, chart, computedColumn, reshape, etc.).
-- customCode is a string (JavaScript) for nodes that support code mode.
+- customCode is a string (Python) for nodes that support code mode.
 - Preserve any fields the user did not ask to change. Merge updates into existing config where appropriate.`;
 
 router.post('/edit-nodes', async (req, res) => {

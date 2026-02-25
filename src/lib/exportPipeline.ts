@@ -345,3 +345,33 @@ export function buildScriptFromCellCodes(
   const preamble = 'import pandas as pd\n\n';
   return preamble + body;
 }
+
+/**
+ * Build a script safe to run in the browser (Pyodide). Data source cells are not executed
+ * (no pd.read_csv etc.) and are replaced with a placeholder so downstream cells receive
+ * an empty DataFrame with the same columns when columnNames is provided (avoids KeyError
+ * in sort_values, groupby, etc.). Use this for "Run all" / "Run cell"; use the full script for export and import.
+ */
+export function buildScriptForBrowserRun(
+  cells: CellCode[],
+  upToIndex?: number,
+  columnNames?: string[]
+): string {
+  if (cells.length === 0) return '';
+  const end = upToIndex !== undefined ? Math.min(upToIndex + 1, cells.length) : cells.length;
+  const slice = cells.slice(0, end);
+  const body = slice
+    .map((c) => {
+      if (c.nodeType === 'dataSource') {
+        if (columnNames?.length) {
+          const cols = columnNames.map((n) => JSON.stringify(n)).join(', ');
+          return `# Data source (file load skipped in browser)\ndf = pd.DataFrame(columns=[${cols}])`;
+        }
+        return '# Data source (file load skipped in browser)\ndf = pd.DataFrame()';
+      }
+      return c.code.trim();
+    })
+    .join('\n\n');
+  const preamble = 'import pandas as pd\n\n';
+  return preamble + body;
+}

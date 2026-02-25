@@ -17,6 +17,8 @@ export function CanvasControls() {
   const clearAllNodeBaselines = useCanvasStore((s) => s.clearAllNodeBaselines);
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
   const hasNodeBaselines = Object.keys(baselineByNodeId).length > 0;
+  const focusNodeIdForView = useCanvasStore((s) => s.focusNodeIdForView);
+  const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
 
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDiffModal, setShowDiffModal] = useState(false);
@@ -56,6 +58,17 @@ export function CanvasControls() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showEditWithAIModal]);
+
+  // When code panel focuses a cell, snap canvas viewport to that node
+  useEffect(() => {
+    if (!focusNodeIdForView) return;
+    fitView({
+      nodes: [{ id: focusNodeIdForView }],
+      duration: 300,
+      padding: 0.2,
+    });
+    setFocusNodeIdForView(null);
+  }, [focusNodeIdForView, fitView, setFocusNodeIdForView]);
 
   const nodeData = useDataStore((s) => s.nodeData);
   const dataSchemaForEdit = (() => {

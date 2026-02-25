@@ -1,4 +1,4 @@
-import { type DragEvent, useState } from 'react';
+import { type DragEvent } from 'react';
 import {
   Table,
   Filter,
@@ -10,10 +10,8 @@ import {
   Calculator,
   FlipVertical2,
   GripVertical,
-  Wand2,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
-import { PipelinePrompt } from './PipelinePrompt';
 
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
@@ -28,8 +26,6 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 export function NodePalette() {
-  const [showPrompt, setShowPrompt] = useState(false);
-
   const onDragStart = (
     event: DragEvent<HTMLDivElement>,
     nodeType: string
@@ -41,16 +37,6 @@ export function NodePalette() {
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="shrink-0 border-b border-gray-100 px-3 py-3">
-          <button
-            onClick={() => setShowPrompt(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-indigo-600 hover:shadow-md active:from-blue-700 active:to-indigo-700"
-          >
-            <Wand2 size={16} />
-            Build from description
-          </button>
-        </div>
-
         {/* Node list */}
         <div className="flex-1 overflow-y-auto p-3">
           <div className="space-y-1.5">
@@ -88,13 +74,6 @@ export function NodePalette() {
           </p>
         </div>
       </div>
-
-      {/* Pipeline Prompt modal - rendered outside sidebar */}
-      {showPrompt && (
-        <div className="fixed inset-0 z-50">
-          <PipelinePrompt onClose={() => setShowPrompt(false)} />
-        </div>
-      )}
     </>
   );
 }

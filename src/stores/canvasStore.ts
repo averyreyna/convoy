@@ -21,6 +21,9 @@ interface CanvasStore {
   showImportModal: boolean;
   setShowImportModal: (show: boolean) => void;
 
+  showPrompt: boolean;
+  setShowPrompt: (show: boolean) => void;
+
   welcomeCardDismissed: boolean;
   dismissWelcomeCard: () => void;
 
@@ -53,6 +56,10 @@ interface CanvasStore {
   confirmAllProposed: () => void;
   clearProposed: () => void;
 
+  // Snap code panel focus to canvas: when a code cell is focused, request viewport to fit this node
+  focusNodeIdForView: string | null;
+  setFocusNodeIdForView: (id: string | null) => void;
+
   // React Flow callbacks
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
@@ -65,6 +72,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   showImportModal: false,
   setShowImportModal: (show) => set({ showImportModal: show }),
+
+  showPrompt: false,
+  setShowPrompt: (show) => set({ showPrompt: show }),
 
   welcomeCardDismissed: false,
   dismissWelcomeCard: () => set({ welcomeCardDismissed: true }),
@@ -320,6 +330,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         ),
       };
     }),
+
+  focusNodeIdForView: null,
+  setFocusNodeIdForView: (id) => set({ focusNodeIdForView: id }),
 
   onNodesChange: (changes) =>
     set((state) => ({

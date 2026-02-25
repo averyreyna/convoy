@@ -6,15 +6,17 @@ import {
   topologicalSort,
   exportAsPython,
   buildScriptFromCellCodes,
+  buildScriptForBrowserRun,
   downloadPipelineScript,
   downloadNotebook,
   copyAsJupyterCells,
 } from '@/lib/exportPipeline';
 import { runFullPipelineScript } from '@/lib/pythonRunner';
 import { importPipelineFromPython } from '@/lib/api';
-import { Copy, Download, FileCode, Play, Square } from 'lucide-react';
+import { Copy, Download, FileCode, Play, Square, X } from 'lucide-react';
 
 const EDITOR_OPTIONS = {
+  readOnly: false,
   minimap: { enabled: false },
   fontSize: 11,
   lineNumbers: 'off' as const,
@@ -40,9 +42,19 @@ export function PipelineCodePanel() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const setPipelineFromImport = useCanvasStore((s) => s.setPipelineFromImport);
+  const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
 
   const [runError, setRunError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [focusedCellNodeId, setFocusedCellNodeId] = useState<string | null>(null);
+
+  const activateCell = useCallback(
+    (nodeId: string) => {
+      setFocusedCellNodeId(nodeId);
+      setFocusNodeIdForView(nodeId);
+    },
+    [setFocusNodeIdForView]
+  );
 
   const cells = useMemo(() => {
     const sorted = topologicalSort(nodes, edges);
@@ -71,16 +83,29 @@ export function PipelineCodePanel() {
     [nodes, edges]
   );
 
+  const dataSourceColumnNames = useMemo(() => {
+    const sorted = topologicalSort(nodes, edges);
+    const dataSourceNode = sorted.find((n) => (n.type as string) === 'dataSource');
+    const data = dataSourceNode?.data as { columns?: Array<{ name: string }> } | undefined;
+    return data?.columns?.map((c) => c.name) ?? [];
+  }, [nodes, edges]);
+
   const runScriptAndImport = useCallback(
-    async (script: string) => {
+    async (scriptForImport: string, scriptForRun: string) => {
       setRunError(null);
       setIsRunning(true);
       try {
-        await runFullPipelineScript(script);
-        const { pipeline } = await importPipelineFromPython(script);
+        await runFullPipelineScript(scriptForRun);
+        const { pipeline } = await importPipelineFromPython(scriptForImport);
         setPipelineFromImport(pipeline);
-      } catch (err) {
-        setRunError(err instanceof Error ? err.message : 'Run failed');
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'object' && err !== null && 'message' in err
+              ? String((err as { message: unknown }).message)
+              : String(err);
+        setRunError(msg || 'Run failed');
       } finally {
         setIsRunning(false);
       }
@@ -90,16 +115,18 @@ export function PipelineCodePanel() {
 
   const handleRunAll = useCallback(() => {
     if (cells.length === 0) return;
-    const script = buildScriptFromCellCodes(cells);
-    runScriptAndImport(script);
-  }, [cells, runScriptAndImport]);
+    const scriptForImport = buildScriptFromCellCodes(cells);
+    const scriptForRun = buildScriptForBrowserRun(cells, undefined, dataSourceColumnNames);
+    runScriptAndImport(scriptForImport, scriptForRun);
+  }, [cells, dataSourceColumnNames, runScriptAndImport]);
 
   const handleRunCell = useCallback(
     (cellIndex: number) => {
-      const script = buildScriptFromCellCodes(cells, cellIndex);
-      runScriptAndImport(script);
+      const scriptForImport = buildScriptFromCellCodes(cells, cellIndex);
+      const scriptForRun = buildScriptForBrowserRun(cells, cellIndex, dataSourceColumnNames);
+      runScriptAndImport(scriptForImport, scriptForRun);
     },
-    [cells, runScriptAndImport]
+    [cells, dataSourceColumnNames, runScriptAndImport]
   );
 
   const handleCellChange = useCallback(
@@ -195,8 +222,17 @@ export function PipelineCodePanel() {
       </div>
 
       {runError && (
-        <div className="shrink-0 border-b border-red-100 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-          {runError}
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-red-100 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+          <span className="min-w-0 flex-1 break-words">{runError}</span>
+          <button
+            type="button"
+            onClick={() => setRunError(null)}
+            className="shrink-0 rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-800"
+            title="Dismiss"
+            aria-label="Dismiss error"
+          >
+            <X size={12} />
+          </button>
         </div>
       )}
 
@@ -208,7 +244,14 @@ export function PipelineCodePanel() {
             {cells.map((cell, index) => (
               <div
                 key={cell.nodeId}
-                className="rounded-lg border border-gray-100 bg-gray-50/80"
+                role="button"
+                tabIndex={-1}
+                onClick={() => activateCell(cell.nodeId)}
+                className={`rounded-lg border transition-colors ${
+                  focusedCellNodeId === cell.nodeId
+                    ? 'border-blue-200 bg-blue-50/80 ring-2 ring-blue-200'
+                    : 'border-gray-100 bg-gray-50/80'
+                }`}
               >
                 <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1.5">
                   <span className="text-[10px] font-medium text-gray-500">
@@ -216,7 +259,10 @@ export function PipelineCodePanel() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => handleRunCell(index)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRunCell(index);
+                    }}
                     disabled={isRunning}
                     className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50"
                     title="Run up to this cell and propose nodes"
@@ -236,6 +282,18 @@ export function PipelineCodePanel() {
                     onChange={(value) => handleCellChange(cell.nodeId, value ?? '')}
                     theme="vs-light"
                     options={EDITOR_OPTIONS}
+                    onMount={(editor) => {
+                      const disposableFocus = editor.onDidFocusEditorWidget(() =>
+                        activateCell(cell.nodeId)
+                      );
+                      const disposableBlur = editor.onDidBlurEditorWidget(() =>
+                        setFocusedCellNodeId(null)
+                      );
+                      return () => {
+                        disposableFocus.dispose();
+                        disposableBlur.dispose();
+                      };
+                    }}
                   />
                 </div>
               </div>

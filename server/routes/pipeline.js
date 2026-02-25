@@ -12,7 +12,7 @@ Available node types:
 - groupBy: { groupByColumn: string, aggregateColumn: string, aggregation: "count"|"sum"|"avg"|"min"|"max" }
 - sort: { column: string, direction: "asc"|"desc" }
 - select: { columns: string[] }
-- computedColumn: { newColumnName: string, expression: string } — creates a new column from a JS expression using each row as 'd', e.g. "d.population / d.area"
+- computedColumn: { newColumnName: string, expression: string } — creates a new column from a Python expression using dataframe columns, e.g. "df[\"population\"] / df[\"area\"]"
 - reshape: { keyColumn: string, valueColumn: string, pivotColumns: string[] } — unpivots wide data to long format
 - chart: { chartType: "bar"|"line"|"area"|"scatter"|"pie", xAxis: string, yAxis: string, colorBy?: string }
 

@@ -29,7 +29,8 @@ export function ConvoyCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
-  const [showPrompt, setShowPrompt] = useState(false);
+  const showPrompt = useCanvasStore((s) => s.showPrompt);
+  const setShowPrompt = useCanvasStore((s) => s.setShowPrompt);
   const showImportModal = useCanvasStore((s) => s.showImportModal);
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
 
@@ -154,7 +155,6 @@ export function ConvoyCanvas() {
       {nodes.length === 0 && !welcomeCardDismissed && !showImportModal && (
         <div className="absolute inset-0 z-30 flex items-center justify-center">
           <EntryScreen
-            onOpenPrompt={() => setShowPrompt(true)}
             onOpenImportPython={() => setShowImportModal(true)}
             onDismiss={dismissWelcomeCard}
           />
