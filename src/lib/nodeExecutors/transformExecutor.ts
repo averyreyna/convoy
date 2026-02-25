@@ -1,4 +1,3 @@
-import * as d3 from 'd3';
 import type { DataFrame, Column } from '@/types';
 
 export interface TransformConfig {
@@ -49,49 +48,15 @@ function validateDataFrameShape(value: unknown): DataFrame {
 }
 
 /**
- * Execute a transform node by running user-provided JavaScript code.
- *
- * The code receives `rows` (array of objects), `columns` (array of {name, type}),
- * and `d3` (the D3 library) so generated/pasted D3-style code (e.g. d3.flatRollup,
- * d3.sum) runs without "d3 is not defined".
- *
- * Must return `{ columns, rows }`.
- *
- * Uses `new Function()` for sandboxed execution (same-origin, no access to
- * module scope or DOM beyond what we inject).
+ * Transform execution is handled by the Python runner (nodeExecutors/index.ts).
+ * This file is kept for TransformConfig type and validateDataFrameShape if needed elsewhere.
  */
 export function executeTransform(
-  input: DataFrame,
+  _input: DataFrame,
   config: TransformConfig
 ): DataFrame {
-  const { customCode } = config;
-
-  if (!customCode || customCode.trim() === '') {
-    return input;
+  if (!config.customCode || config.customCode.trim() === '') {
+    return _input;
   }
-
-  // Deep clone to prevent mutation of upstream data
-  const rowsCopy = JSON.parse(JSON.stringify(input.rows));
-  const columnsCopy = JSON.parse(JSON.stringify(input.columns));
-
-  try {
-    const fn = new Function(
-      'rows',
-      'columns',
-      'd3',
-      `"use strict";
-${customCode}`
-    );
-
-    const result = fn(rowsCopy, columnsCopy, d3);
-    return validateDataFrameShape(result);
-  } catch (err) {
-    if (err instanceof SyntaxError) {
-      throw new Error(`Syntax error in transform code: ${err.message}`);
-    }
-    if (err instanceof Error) {
-      throw new Error(`Transform execution error: ${err.message}`);
-    }
-    throw new Error('Transform execution failed with an unknown error.');
-  }
+  throw new Error('Transform execution is handled by the Python runner. Use executeNode() instead.');
 }

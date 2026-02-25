@@ -12,7 +12,7 @@ import {
 import type { ProposedPipeline } from '@/types';
 import { usePreferencesStore } from './preferencesStore';
 
-export type BaselineLanguage = 'python' | 'javascript';
+export type BaselineLanguage = 'python';
 
 interface CanvasStore {
   nodes: Node[];
@@ -20,8 +20,9 @@ interface CanvasStore {
 
   showImportModal: boolean;
   setShowImportModal: (show: boolean) => void;
-  showImportD3Modal: boolean;
-  setShowImportD3Modal: (show: boolean) => void;
+
+  welcomeCardDismissed: boolean;
+  dismissWelcomeCard: () => void;
 
   // Baseline (for diff viewer): set on import or "Pin current"
   baselineCode: string | null;
@@ -64,8 +65,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   showImportModal: false,
   setShowImportModal: (show) => set({ showImportModal: show }),
-  showImportD3Modal: false,
-  setShowImportD3Modal: (show) => set({ showImportD3Modal: show }),
+
+  welcomeCardDismissed: false,
+  dismissWelcomeCard: () => set({ welcomeCardDismissed: true }),
 
   baselineCode: null,
   baselineLanguage: null,

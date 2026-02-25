@@ -1,10 +1,8 @@
-import { useMemo, useEffect, useCallback, useState } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import { diffLines, type Change } from 'diff';
 import { X, Pin, Trash2 } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
-import { usePreferencesStore } from '@/stores/preferencesStore';
-import { exportAsPython, exportAsJavaScript } from '@/lib/exportPipeline';
-import type { BaselineLanguage } from '@/stores/canvasStore';
+import { exportAsPython } from '@/lib/exportPipeline';
 
 const PLACEHOLDER = 'No baseline—import code or pin current';
 
@@ -51,32 +49,13 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const baselineCode = useCanvasStore((s) => s.baselineCode);
-  const baselineLanguage = useCanvasStore((s) => s.baselineLanguage);
   const setBaselineFromPin = useCanvasStore((s) => s.setBaselineFromPin);
   const clearBaseline = useCanvasStore((s) => s.clearBaseline);
 
-  const preferredExportLanguage = usePreferencesStore(
-    (s) => s.preferredExportLanguage
-  );
-  const [diffLanguage, setDiffLanguage] = useState<BaselineLanguage>(
-    () => preferredExportLanguage
-  );
-
-  // When opening with no baseline, use preferred script language
-  useEffect(() => {
-    if (isOpen && !baselineLanguage) {
-      setDiffLanguage(preferredExportLanguage);
-    }
-  }, [isOpen, baselineLanguage, preferredExportLanguage]);
-
-  const effectiveLang = baselineLanguage ?? diffLanguage;
-
   const currentExport = useMemo(() => {
     if (nodes.length === 0) return '';
-    return effectiveLang === 'python'
-      ? exportAsPython(nodes, edges)
-      : exportAsJavaScript(nodes, edges);
-  }, [nodes, edges, effectiveLang]);
+    return exportAsPython(nodes, edges);
+  }, [nodes, edges]);
 
   const leftText = baselineCode ?? '';
   const rightText = currentExport;
@@ -89,9 +68,9 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
 
   const handlePinCurrent = useCallback(() => {
     if (currentExport) {
-      setBaselineFromPin(currentExport, effectiveLang);
+      setBaselineFromPin(currentExport, 'python');
     }
-  }, [currentExport, effectiveLang, setBaselineFromPin]);
+  }, [currentExport, setBaselineFromPin]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -103,8 +82,6 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
 
   if (!isOpen) return null;
 
-  const langLabel = effectiveLang === 'python' ? 'Python' : 'JavaScript';
-
   return (
     <div
       className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/30 backdrop-blur-sm"
@@ -114,21 +91,9 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold text-gray-900">Code changes</h2>
-            {!baselineLanguage && (
-              <select
-                value={diffLanguage}
-                onChange={(e) => setDiffLanguage(e.target.value as BaselineLanguage)}
-                className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700"
-              >
-                <option value="python">Python</option>
-                <option value="javascript">JavaScript</option>
-              </select>
-            )}
-            {baselineLanguage && (
-              <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                {langLabel}
-              </span>
-            )}
+            <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              Python
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button

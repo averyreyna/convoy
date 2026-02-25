@@ -32,7 +32,7 @@ export function useNodeExecution(
   // Track last execution to avoid redundant re-runs
   const lastExecKey = useRef<string>('');
 
-  const execute = useCallback(() => {
+  const execute = useCallback(async () => {
     if (!upstreamData || !isConfirmed) return;
 
     // Create a key from the config + upstream data length + custom code to detect changes
@@ -48,7 +48,7 @@ export function useNodeExecution(
     lastExecKey.current = execKey;
 
     try {
-      const result: DataFrame = executeNode(
+      const result: DataFrame = await executeNode(
         nodeType,
         upstreamData,
         config,

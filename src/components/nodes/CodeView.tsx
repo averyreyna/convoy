@@ -31,9 +31,9 @@ type EditorStatus = 'idle' | 'valid' | 'syntax-error' | 'runtime-error';
 
 /**
  * Code view toggle and editor component for nodes.
- * Provides a Simple/Code toggle and a Monaco editor with JavaScript syntax highlighting.
+ * Provides a Simple/Code toggle and a Monaco editor with Python syntax highlighting.
  * Validates code on every keystroke (syntax only) and shows inline errors.
- * When the user edits code, it becomes "custom" and executes via the sandboxed executor.
+ * When the user edits code, it becomes "custom" and executes via the Python runner.
  */
 export function CodeView({
   nodeType,
@@ -47,7 +47,7 @@ export function CodeView({
   upstreamColumns,
 }: CodeViewProps) {
   const editorLanguage = getEditorLanguage(nodeType);
-  const isExecutableCode = editorLanguage === 'javascript';
+  const isExecutableCode = editorLanguage === 'python';
 
   // Generate code from the current config
   const [generatedCode, setGeneratedCode] = useState(() =>
@@ -241,9 +241,9 @@ export function CodeView({
         updateEditorHeight();
       });
 
-      // Register column-name autocomplete for JavaScript nodes
+      // Register column-name autocomplete for Python nodes
       if (isExecutableCode && upstreamColumns && upstreamColumns.length > 0) {
-        monaco.languages.registerCompletionItemProvider('javascript', {
+        monaco.languages.registerCompletionItemProvider('python', {
           triggerCharacters: ['.', '[', '"', "'"],
           provideCompletionItems: (model: monacoEditor.ITextModel, position: import('monaco-editor').Position) => {
             const word = model.getWordUntilPosition(position);

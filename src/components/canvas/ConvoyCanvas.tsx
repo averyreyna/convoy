@@ -16,7 +16,6 @@ import { CanvasControls } from './CanvasControls';
 import { nodeTypeInfos } from '@/components/nodes';
 import { PipelinePrompt } from './PipelinePrompt';
 import { ImportFromPythonModal } from './ImportFromPythonModal';
-import { ImportFromD3Modal } from './ImportFromD3Modal';
 import { ProposedPipelineBanner } from './ProposedPipelineBanner';
 import { EntryScreen } from './EntryScreen';
 
@@ -33,11 +32,11 @@ export function ConvoyCanvas() {
   const [showPrompt, setShowPrompt] = useState(false);
   const showImportModal = useCanvasStore((s) => s.showImportModal);
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
-  const showImportD3Modal = useCanvasStore((s) => s.showImportD3Modal);
-  const setShowImportD3Modal = useCanvasStore((s) => s.setShowImportD3Modal);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const welcomeCardDismissed = useCanvasStore((s) => s.welcomeCardDismissed);
+  const dismissWelcomeCard = useCanvasStore((s) => s.dismissWelcomeCard);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
@@ -105,7 +104,6 @@ export function ConvoyCanvas() {
           type: 'dataFlow',
           animated: true,
         }}
-        fitView
         proOptions={{ hideAttribution: true }}
         className="bg-gray-50"
         snapToGrid
@@ -115,6 +113,7 @@ export function ConvoyCanvas() {
         selectionOnDrag
         selectionKeyCode="Shift"
         multiSelectionKeyCode="Shift"
+        defaultViewport={{ x: 0, y: 0, zoom: 0.85 }}
       >
         <Background
           variant={BackgroundVariant.Dots}
@@ -151,18 +150,15 @@ export function ConvoyCanvas() {
         <ImportFromPythonModal onClose={() => setShowImportModal(false)} />
       )}
 
-      {/* Import from D3 modal */}
-      {showImportD3Modal && (
-        <ImportFromD3Modal onClose={() => setShowImportD3Modal(false)} />
-      )}
-
-      {/* Phase 2: NL-first entry — show when no nodes (first paint is prompt/import) */}
-      {nodes.length === 0 && !showImportModal && !showImportD3Modal && (
-        <EntryScreen
-          onOpenPrompt={() => setShowPrompt(true)}
-          onOpenImportPython={() => setShowImportModal(true)}
-          onOpenImportD3={() => setShowImportD3Modal(true)}
-        />
+      {/* Welcome card on canvas when empty — user can dismiss if they don't need it */}
+      {nodes.length === 0 && !welcomeCardDismissed && !showImportModal && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center">
+          <EntryScreen
+            onOpenPrompt={() => setShowPrompt(true)}
+            onOpenImportPython={() => setShowImportModal(true)}
+            onDismiss={dismissWelcomeCard}
+          />
+        </div>
       )}
     </div>
   );

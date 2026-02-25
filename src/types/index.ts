@@ -101,12 +101,6 @@ export interface ImportFromPythonResponse {
   method?: 'ast' | 'llm';
 }
 
-// Response from import-from-d3 API
-export interface ImportFromD3Response {
-  pipeline: ProposedPipeline;
-  method?: 'pattern' | 'llm';
-}
-
 // Node type metadata for the palette
 export interface NodeTypeInfo {
   type: string;

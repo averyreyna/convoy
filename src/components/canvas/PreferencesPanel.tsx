@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Settings } from 'lucide-react';
-import { usePreferencesStore, type PreferredExportLanguage } from '@/stores/preferencesStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
@@ -17,12 +17,6 @@ export function PreferencesPanel({
 
   const showCodeByDefault = usePreferencesStore((s) => s.showCodeByDefault);
   const setShowCodeByDefault = usePreferencesStore((s) => s.setShowCodeByDefault);
-  const preferredExportLanguage = usePreferencesStore(
-    (s) => s.preferredExportLanguage
-  );
-  const setPreferredExportLanguage = usePreferencesStore(
-    (s) => s.setPreferredExportLanguage
-  );
   const suggestNextSteps = usePreferencesStore((s) => s.suggestNextSteps);
   const setSuggestNextSteps = usePreferencesStore((s) => s.setSuggestNextSteps);
 
@@ -68,16 +62,7 @@ export function PreferencesPanel({
           <span className="block text-xs text-gray-700">
             Default script language
           </span>
-          <select
-            value={preferredExportLanguage}
-            onChange={(e) =>
-              setPreferredExportLanguage(e.target.value as PreferredExportLanguage)
-            }
-            className="mt-1 w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-800"
-          >
-            <option value="python">Python</option>
-            <option value="javascript">JavaScript</option>
-          </select>
+          <span className="mt-1 block text-xs font-medium text-gray-800">Python</span>
         </div>
         <label className="flex cursor-pointer items-center justify-between gap-2 py-1.5">
           <span className="text-xs text-gray-700">Suggest next steps</span>

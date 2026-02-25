@@ -8,7 +8,7 @@ import { persist } from 'zustand/middleware';
 
 const STORAGE_KEY = 'convoy.preferences';
 
-export type PreferredExportLanguage = 'python' | 'javascript';
+export type PreferredExportLanguage = 'python';
 
 interface PreferencesState {
   showCodeByDefault: boolean;

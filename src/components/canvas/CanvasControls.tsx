@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Panel, useReactFlow } from '@xyflow/react';
-import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Download, ExternalLink, GitCompare, Wand2, X, AlertCircle, Pin, Trash2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Download, GitCompare, Wand2, X, AlertCircle, Pin, Trash2 } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { downloadPipelineScript } from '@/lib/exportPipeline';
-import { checkDatawrapperStatus } from '@/lib/datawrapper';
 import { editNodes } from '@/lib/api';
-import { DatawrapperExportModal } from './DatawrapperExportModal';
 import { ScriptDiffModal } from './ScriptDiffModal';
 
 export function CanvasControls() {
@@ -15,15 +13,12 @@ export function CanvasControls() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
-  const setShowImportD3Modal = useCanvasStore((s) => s.setShowImportD3Modal);
   const setBaselineForSelection = useCanvasStore((s) => s.setBaselineForSelection);
   const clearAllNodeBaselines = useCanvasStore((s) => s.clearAllNodeBaselines);
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
   const hasNodeBaselines = Object.keys(baselineByNodeId).length > 0;
 
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [dwConfigured, setDwConfigured] = useState<boolean | null>(null);
-  const [showDwModal, setShowDwModal] = useState(false);
   const [showDiffModal, setShowDiffModal] = useState(false);
   const [showEditWithAIModal, setShowEditWithAIModal] = useState(false);
   const [editPrompt, setEditPrompt] = useState('');
@@ -39,11 +34,6 @@ export function CanvasControls() {
   };
 
   const hasNodes = nodes.length > 0;
-
-  // Check Datawrapper token status on mount
-  useEffect(() => {
-    checkDatawrapperStatus().then(setDwConfigured);
-  }, []);
 
   // Close menu on outside click
   useEffect(() => {
@@ -66,58 +56,6 @@ export function CanvasControls() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showEditWithAIModal]);
-
-  /**
-   * Find the best data to export: the last transformation node's output
-   * (upstream of the Chart node, or the last node if no chart exists).
-   * Also returns the Chart node's config if one exists.
-   */
-  const getPipelineExportData = useCallback(() => {
-    const parentMap = new Map<string, string>();
-    for (const edge of edges) {
-      parentMap.set(edge.target, edge.source);
-    }
-
-    // Find chart node (if any) and its upstream data node
-    const chartNode = nodes.find((n) => n.type === 'chart');
-    let dataNodeId: string | undefined;
-
-    if (chartNode) {
-      // The chart's upstream node has the data we want
-      dataNodeId = parentMap.get(chartNode.id);
-    }
-
-    if (!dataNodeId) {
-      // No chart or no upstream: find the last non-chart confirmed node
-      // Walk from nodes that have no outgoing edges (leaf nodes)
-      const hasOutgoing = new Set(edges.map((e) => e.source));
-      const leafNodes = nodes.filter(
-        (n) => n.type !== 'chart' && !hasOutgoing.has(n.id)
-      );
-      dataNodeId = leafNodes[leafNodes.length - 1]?.id;
-    }
-
-    if (!dataNodeId) {
-      // Fallback: just use the first node with output data
-      const outputKeys = Object.keys(useDataStore.getState().nodeOutputs);
-      dataNodeId = outputKeys[outputKeys.length - 1];
-    }
-
-    const dataFrame = dataNodeId
-      ? useDataStore.getState().getNodeOutput(dataNodeId)
-      : undefined;
-
-    const chartConfig = chartNode
-      ? (chartNode.data as Record<string, unknown>)
-      : undefined;
-
-    return { dataFrame, chartConfig };
-  }, [nodes, edges]);
-
-  const handleDatawrapperExport = useCallback(() => {
-    setShowExportMenu(false);
-    setShowDwModal(true);
-  }, []);
 
   const nodeData = useDataStore((s) => s.nodeData);
   const dataSchemaForEdit = (() => {
@@ -167,10 +105,6 @@ export function CanvasControls() {
       setEditLoading(false);
     }
   }, [editPrompt, selectedCount, selectedNodes, nodes, edges, dataSchemaForEdit, updateNode]);
-
-  const { dataFrame, chartConfig } = showDwModal
-    ? getPipelineExportData()
-    : { dataFrame: undefined, chartConfig: undefined };
 
   return (
     <>
@@ -238,18 +172,6 @@ export function CanvasControls() {
               <button
                 onClick={() => {
                   setShowExportMenu(false);
-                  setShowImportD3Modal(true);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
-              >
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-amber-100 text-[9px] font-bold text-amber-700">
-                  D3
-                </span>
-                Import from D3
-              </button>
-              <button
-                onClick={() => {
-                  setShowExportMenu(false);
                   setShowDiffModal(true);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
@@ -273,22 +195,7 @@ export function CanvasControls() {
               )}
               <button
                 onClick={() => {
-                  downloadPipelineScript(nodes, edges, 'javascript');
-                  setShowExportMenu(false);
-                }}
-                disabled={!hasNodes}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
-                  hasNodes ? 'text-gray-700 hover:bg-gray-50' : 'cursor-not-allowed text-gray-400'
-                }`}
-              >
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-yellow-100 text-[9px] font-bold text-yellow-700">
-                  JS
-                </span>
-                Export as JavaScript
-              </button>
-              <button
-                onClick={() => {
-                  downloadPipelineScript(nodes, edges, 'python');
+                  downloadPipelineScript(nodes, edges);
                   setShowExportMenu(false);
                 }}
                 disabled={!hasNodes}
@@ -300,33 +207,6 @@ export function CanvasControls() {
                   PY
                 </span>
                 Export as Python
-              </button>
-
-              {/* Divider */}
-              <div className="my-1 h-px bg-gray-100" />
-
-              {/* Datawrapper export */}
-              <button
-                onClick={handleDatawrapperExport}
-                disabled={dwConfigured === false || !hasNodes}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
-                  dwConfigured === false || !hasNodes
-                    ? 'cursor-not-allowed text-gray-400'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-                title={
-                  !hasNodes
-                    ? 'Add nodes to export'
-                    : dwConfigured === false
-                      ? 'Add DATAWRAPPER_API_TOKEN to .env to enable'
-                      : 'Send pipeline data to Datawrapper'
-                }
-              >
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700">
-                  DW
-                </span>
-                Send to Datawrapper
-                <ExternalLink size={10} className="ml-auto opacity-50" />
               </button>
             </div>
           )}
@@ -369,14 +249,6 @@ export function CanvasControls() {
           </button>
         </div>
       </Panel>
-
-      {/* Datawrapper Export Modal */}
-      <DatawrapperExportModal
-        isOpen={showDwModal}
-        onClose={() => setShowDwModal(false)}
-        dataFrame={dataFrame}
-        chartConfig={chartConfig}
-      />
 
       {/* Script diff / Code changes modal */}
       <ScriptDiffModal
