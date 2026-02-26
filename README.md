@@ -2,7 +2,9 @@
 
 Convoy is a canvas-based data visualization tool that helps you build and run data pipelines through an interactive node graph. You connect data sources to filter, transform, group, and chart nodes, with optional AI-assisted pipeline suggestions powered by Anthropic. The tool supports exporting pipelines to Python scripts and Jupyter notebooks.
 
-![](convoy.gif)
+<p align="center">
+  <img src="convoy.gif" />
+</p>
 
 ## Prerequisites
 
