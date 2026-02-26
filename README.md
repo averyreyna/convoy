@@ -40,16 +40,6 @@ Before you begin, ensure you have the following installed:
 
 5. **Open http://localhost:5173 in your browser to see the application.**
 
-## Phase 4: Light preferences
-
-Click the **gear icon** in the sidebar header to open **Settings**:
-
-- **Show code by default in nodes** — New nodes (from palette, proposed pipeline, or import) open in code view instead of simple view when enabled. Existing nodes are unchanged.
-- **Default script language** — Python; used when opening the Code changes diff viewer with no baseline.
-- **Suggest next steps** — Optional; reserved for future use.
-
-Preferences are stored in `localStorage` under `convoy.preferences` and survive refresh.
-
 ## Available Scripts
 
 - `npm run dev` - Start the development server (Vite + API server)
