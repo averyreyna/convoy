@@ -90,18 +90,7 @@ samp {
   height: 100vh;
 }
 
-/* Phase 1: Lilac selection/drag (React Flow box select and drag-selection area) */
-.react-flow {
-  --xy-selection-background-color-default: rgba(200, 180, 220, 0.25);
-  --xy-selection-border-default: 1px dotted rgba(160, 140, 200, 0.9);
-}
-.react-flow__nodesselection,
-.react-flow__nodesselection-rect {
-  background: rgba(200, 180, 220, 0.25);
-  border: 1px dotted rgba(160, 140, 200, 0.9);
-}
-
-/* Selected node: no light fill, only dotted outline (dots rendered by BaseNode SVG) */
+/* Selected node: no light fill, only dotted outline from BaseNode */
 .react-flow__node.selectable.selected {
   --xy-node-boxshadow-selected: none;
 }
