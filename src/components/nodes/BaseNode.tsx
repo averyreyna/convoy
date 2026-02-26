@@ -2,7 +2,7 @@ import { memo, useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { diffLines, type Change } from 'diff';
-import { ChevronDown, ChevronRight, GitCompare } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitCompare, Square, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { ExplanationPopover } from './ExplanationPopover';
@@ -63,6 +63,8 @@ export const BaseNode = memo(function BaseNode({
 }: BaseNodeProps) {
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
   const clearNodeBaseline = useCanvasStore((s) => s.clearNodeBaseline);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
 
   const baseline = nodeId ? baselineByNodeId[nodeId] : undefined;
   const configChanged = useMemo(() => {
@@ -97,7 +99,7 @@ export const BaseNode = memo(function BaseNode({
           'border-solid border-gray-200': state === 'confirmed',
           'border-solid border-red-400 shadow-red-100': state === 'error',
           'animate-pulse border-blue-400 shadow-blue-100': state === 'running',
-          'border-blue-200 bg-blue-50/50 ring-1 ring-blue-100': selected,
+          'border-2 border-dotted border-blue-200 bg-blue-50/50': selected,
         }
       )}
     >
@@ -112,7 +114,32 @@ export const BaseNode = memo(function BaseNode({
 
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
-        <span className="flex items-center text-gray-500">{icon}</span>
+        {nodeId != null ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
+              const next = selectedIds.includes(nodeId)
+                ? selectedIds.filter((id) => id !== nodeId)
+                : [...selectedIds, nodeId];
+              setSelectedNodeIds(next);
+            }}
+            className="flex items-center text-gray-500 transition-colors hover:text-gray-700"
+            title={selected ? 'Remove from selection' : 'Add to selection'}
+            aria-label={selected ? 'Remove from selection' : 'Add to selection'}
+          >
+            {selected ? (
+              <CheckSquare size={18} className="text-blue-500" />
+            ) : (
+              <Square size={18} className="text-gray-500" />
+            )}
+          </button>
+        ) : (
+          <span className="flex items-center text-gray-500">
+            <Square size={18} />
+          </span>
+        )}
         <span className="text-sm font-medium text-gray-800">{title}</span>
         <div className="ml-auto flex items-center gap-1">
           {showExplanation && (

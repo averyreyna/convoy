@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Table,
   Filter,
@@ -10,13 +9,10 @@ import {
   Calculator,
   FlipVertical2,
   FileCode,
-  Database,
-  Loader2,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { SAMPLE_DATASETS, loadSampleIntoDataSource, type SampleDataset } from '@/lib/sampleData';
 
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
@@ -36,9 +32,6 @@ export function NodePalette() {
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
   const showCodeByDefault = usePreferencesStore((s) => s.showCodeByDefault);
 
-  const [loadingSampleId, setLoadingSampleId] = useState<string | null>(null);
-  const [sampleError, setSampleError] = useState<string | null>(null);
-
   const handleAddNode = (type: string) => {
     const info = nodeTypeInfos.find((n) => n.type === type);
     if (!info) return;
@@ -54,19 +47,6 @@ export function NodePalette() {
         ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
       },
     });
-  };
-
-  const handleSampleClick = async (sample: SampleDataset) => {
-    setSampleError(null);
-    setLoadingSampleId(sample.id);
-    const nodeId = `node-${Date.now()}`;
-    try {
-      await loadSampleIntoDataSource(nodeId, sample);
-    } catch (err) {
-      setSampleError(err instanceof Error ? err.message : 'Failed to load sample');
-    } finally {
-      setLoadingSampleId(null);
-    }
   };
 
   return (
@@ -86,32 +66,7 @@ export function NodePalette() {
               <FileCode size={14} className="text-emerald-600" />
               Import Python
             </button>
-            {SAMPLE_DATASETS.map((sample) => {
-              const isLoading = loadingSampleId === sample.id;
-              return (
-                <button
-                  key={sample.id}
-                  type="button"
-                  onClick={() => handleSampleClick(sample)}
-                  disabled={loadingSampleId != null}
-                  title={sample.description}
-                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:bg-blue-50/50 disabled:opacity-60"
-                >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-gray-100">
-                    {isLoading ? (
-                      <Loader2 size={14} className="animate-spin text-blue-600" />
-                    ) : (
-                      <Database size={14} className="text-gray-600" />
-                    )}
-                  </span>
-                  <span className="truncate">{sample.label}</span>
-                </button>
-              );
-            })}
           </div>
-          {sampleError && (
-            <p className="mt-1.5 text-[10px] text-red-600">{sampleError}</p>
-          )}
         </div>
 
         {/* Node types — click to add */}

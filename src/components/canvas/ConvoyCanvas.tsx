@@ -56,9 +56,6 @@ export function ConvoyCanvas() {
         snapGrid={[16, 16]}
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
         deleteKeyCode={['Backspace', 'Delete']}
-        selectionOnDrag
-        selectionKeyCode="Shift"
-        multiSelectionKeyCode="Shift"
         defaultViewport={{ x: 0, y: 0, zoom: 0.85 }}
       >
         <Background
