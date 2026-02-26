@@ -58,6 +58,9 @@ function pyEscape(s: string): string {
   return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+const FILTER_PLACEHOLDER = `# Filter node — configure column, condition, and value to generate code
+# df = df[<condition>]`;
+
 function generateFilterCode(config: Record<string, unknown>): string {
   const { column, operator, value } = config;
 
@@ -66,8 +69,15 @@ function generateFilterCode(config: Record<string, unknown>): string {
 # df = df[<condition>]`;
   }
 
-  const colEscaped = pyEscape(column);
-  const valueStr = value !== undefined && value !== null ? String(value) : '';
+  // For comparison and string ops, value is required (empty value produces invalid code e.g. int64 vs str)
+  const valueStr = value !== undefined && value !== null ? String(value).trim() : '';
+  const needValue = ['eq', 'neq', 'gt', 'lt', 'contains', 'startsWith'].includes(operator as string);
+  if (needValue && valueStr === '') {
+    return FILTER_PLACEHOLDER;
+  }
+
+  const colStr = typeof column === 'string' ? column : String(column ?? '');
+  const colEscaped = pyEscape(colStr);
 
   const numValue = Number(value);
   const isNumeric = valueStr !== '' && !isNaN(numValue);
