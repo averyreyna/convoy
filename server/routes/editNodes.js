@@ -1,7 +1,4 @@
-import express from 'express';
 import { getClient } from '../lib/ai.js';
-
-const router = express.Router();
 
 const EDIT_NODES_SYSTEM_PROMPT = `You are a data visualization assistant for Convoy. The user has selected one or more nodes on the canvas and wants to edit them with a natural language prompt.
 
@@ -27,17 +24,22 @@ Rules:
 - customCode is a string (Python) for nodes that support code mode.
 - Preserve any fields the user did not ask to change. Merge updates into existing config where appropriate.`;
 
-router.post('/edit-nodes', async (req, res) => {
+/**
+ * POST /api/edit-nodes handler. Export so index can register it directly.
+ */
+export async function editNodesHandler(req, res) {
   const { nodeIds, prompt, schema, pipelineContext } = req.body;
 
   if (!nodeIds || !Array.isArray(nodeIds) || nodeIds.length === 0 || !prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Missing or invalid nodeIds or prompt' });
+    res.status(400).json({ error: 'Missing or invalid nodeIds or prompt' });
+    return;
   }
 
   const client = getClient();
   if (!client) {
     console.log('No API key — returning empty updates');
-    return res.json({ updates: {} });
+    res.json({ updates: {} });
+    return;
   }
 
   try {
@@ -75,7 +77,8 @@ Respond with a single JSON object with an "updates" key mapping nodeId to { conf
     const text = content.text.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return res.json({ updates: {} });
+      res.json({ updates: {} });
+      return;
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
@@ -89,11 +92,11 @@ Respond with a single JSON object with an "updates" key mapping nodeId to { conf
     res.json({ updates: allowed });
   } catch (error) {
     console.error('Edit nodes error:', error);
+    const message =
+      error instanceof Error ? error.message : 'Failed to generate edits';
     res.status(500).json({
-      error: 'Failed to generate edits',
+      error: message,
       updates: {},
     });
   }
-});
-
-export default router;
+}

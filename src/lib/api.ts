@@ -5,6 +5,14 @@
 
 import type { ProposedPipeline, ImportFromPythonResponse } from '@/types';
 
+/**
+ * Base URL for API requests. In dev we default to the backend so the request
+ * always hits our server (avoids proxy 404). Override with VITE_API_URL if needed.
+ */
+const API_BASE =
+  (import.meta.env.VITE_API_URL as string) ||
+  (import.meta.env.DEV ? 'http://localhost:3001' : '');
+
 interface DataSchema {
   columns: Array<{ name: string; type: string }>;
 }
@@ -132,7 +140,7 @@ export async function editNodes(params: {
 }): Promise<EditNodesResponse> {
   const { nodeIds, prompt, schema, pipelineContext } = params;
 
-  const response = await fetch('/api/edit-nodes', {
+  const response = await fetch(`${API_BASE}/api/edit-nodes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -144,8 +152,17 @@ export async function editNodes(params: {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `Edit nodes failed with status ${response.status}`);
+    const text = await response.text();
+    let message: string;
+    try {
+      const body = JSON.parse(text) as { error?: string };
+      message = body.error || `Edit nodes failed (${response.status})`;
+    } catch {
+      message = text
+        ? `Edit nodes failed (${response.status}). ${text.slice(0, 200)}`
+        : `Edit nodes failed (${response.status}). No details from server.`;
+    }
+    throw new Error(message);
   }
 
   const data: EditNodesResponse = await response.json();

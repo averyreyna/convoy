@@ -64,6 +64,9 @@ interface CanvasStore {
   focusNodeIdForView: string | null;
   setFocusNodeIdForView: (id: string | null) => void;
 
+  // Selection (canvas + code panel): set selected node IDs so both surfaces stay in sync
+  setSelectedNodeIds: (nodeIds: string[]) => void;
+
   // React Flow callbacks
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
@@ -421,6 +424,14 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   focusNodeIdForView: null,
   setFocusNodeIdForView: (id) => set({ focusNodeIdForView: id }),
+
+  setSelectedNodeIds: (nodeIds) =>
+    set((state) => ({
+      nodes: state.nodes.map((node) => ({
+        ...node,
+        selected: nodeIds.includes(node.id),
+      })),
+    })),
 
   onNodesChange: (changes) =>
     set((state) => ({

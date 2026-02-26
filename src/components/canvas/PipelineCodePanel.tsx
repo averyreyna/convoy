@@ -46,10 +46,12 @@ export function PipelineCodePanel() {
   const applyImportToExistingPipeline = useCanvasStore((s) => s.applyImportToExistingPipeline);
   const setPipelineFromImport = useCanvasStore((s) => s.setPipelineFromImport);
   const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
+  const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
 
   const [runError, setRunError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [focusedCellNodeId, setFocusedCellNodeId] = useState<string | null>(null);
+  const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
   const [draftCells, setDraftCells] = useState<Array<{ id: string; code: string }>>([]);
   const [copyFeedback, setCopyFeedback] = useState<'script' | 'jupyter' | null>(null);
 
@@ -237,6 +239,53 @@ export function PipelineCodePanel() {
     }
   }, [cells, draftCells.length, nodes, edges]);
 
+  const selectedNodeIds = useMemo(
+    () => new Set(nodes.filter((n) => n.selected).map((n) => n.id)),
+    [nodes]
+  );
+
+  const handleCellClick = useCallback(
+    (e: React.MouseEvent, cell: { nodeId: string }, index: number) => {
+      const isDraft = cell.nodeId.startsWith('draft-');
+      if (isDraft) {
+        activateCell(cell.nodeId);
+        return;
+      }
+      const shift = e.shiftKey;
+      const meta = e.metaKey || e.ctrlKey;
+      if (shift) {
+        const anchor = selectionAnchorIndex ?? index;
+        const lo = Math.min(anchor, index);
+        const hi = Math.max(anchor, index);
+        const nodeIdsInRange = cells
+          .slice(lo, hi + 1)
+          .filter((c) => !c.nodeId.startsWith('draft-'))
+          .map((c) => c.nodeId);
+        setSelectedNodeIds(nodeIdsInRange);
+        setSelectionAnchorIndex(anchor);
+        activateCell(cell.nodeId);
+      } else if (meta) {
+        const next = new Set(selectedNodeIds);
+        if (next.has(cell.nodeId)) next.delete(cell.nodeId);
+        else next.add(cell.nodeId);
+        setSelectedNodeIds(Array.from(next));
+        setSelectionAnchorIndex(index);
+        activateCell(cell.nodeId);
+      } else {
+        setSelectedNodeIds([cell.nodeId]);
+        setSelectionAnchorIndex(index);
+        activateCell(cell.nodeId);
+      }
+    },
+    [
+      activateCell,
+      cells,
+      selectionAnchorIndex,
+      selectedNodeIds,
+      setSelectedNodeIds,
+    ]
+  );
+
   return (
     <div className="flex h-full flex-col border-l border-gray-200 bg-white">
       <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-2 py-1.5">
@@ -331,16 +380,24 @@ export function PipelineCodePanel() {
           </p>
         ) : (
           <div className="space-y-2">
-            {cells.map((cell, index) => (
+            {cells.map((cell, index) => {
+              const isNodeBacked = !cell.nodeId.startsWith('draft-');
+              const isSelected = isNodeBacked && selectedNodeIds.has(cell.nodeId);
+              const isFocused = focusedCellNodeId === cell.nodeId;
+              return (
               <div
                 key={cell.nodeId}
                 role="button"
                 tabIndex={-1}
-                onClick={() => activateCell(cell.nodeId)}
-                className={`rounded-lg border transition-colors ${
-                  focusedCellNodeId === cell.nodeId
-                    ? 'border-blue-200 bg-blue-50/80 ring-2 ring-blue-200'
-                    : 'border-gray-100 bg-gray-50/80'
+                onClick={(e) => handleCellClick(e, cell, index)}
+                className={`rounded-lg border ring-2 ring-transparent transition-[border-color,box-shadow,background-color] duration-150 ${
+                  isFocused && isSelected
+                    ? 'border-blue-200 bg-blue-100/80 ring-blue-200'
+                    : isFocused
+                      ? 'border-blue-200 bg-blue-50/80 ring-blue-200'
+                      : isSelected
+                        ? 'border-blue-100 bg-blue-50/60 ring-blue-100'
+                        : 'border-gray-100 bg-gray-50/80'
                 }`}
               >
                 <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1">
@@ -387,7 +444,8 @@ export function PipelineCodePanel() {
                   />
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>
