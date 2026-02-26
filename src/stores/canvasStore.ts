@@ -10,10 +10,38 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import type { ProposedPipeline } from '@/types';
+import { topologicalSort } from '@/lib/exportPipeline';
+import { usePreferencesStore } from './preferencesStore';
+
+export interface ApplyImportOptions {
+  /** When set (Run cell at index K), only update existing nodes at indices 0..K. */
+  upToIndex?: number;
+}
+
+export type BaselineLanguage = 'python';
 
 interface CanvasStore {
   nodes: Node[];
   edges: Edge[];
+
+  showImportModal: boolean;
+  setShowImportModal: (show: boolean) => void;
+
+  showPrompt: boolean;
+  setShowPrompt: (show: boolean) => void;
+
+  // Baseline (for diff viewer): set on import or "Pin current"
+  baselineCode: string | null;
+  baselineLanguage: BaselineLanguage | null;
+  setBaselineFromImport: (code: string, language: BaselineLanguage) => void;
+  setBaselineFromPin: (code: string, language: BaselineLanguage) => void;
+  clearBaseline: () => void;
+
+  // Per-node baseline for inline diff: "Pin selection" writes selected nodes' config/code here
+  baselineByNodeId: Record<string, { config: Record<string, unknown>; customCode?: string }>;
+  setBaselineForSelection: () => void;
+  clearNodeBaseline: (nodeId: string) => void;
+  clearAllNodeBaselines: () => void;
 
   // Node operations
   addNode: (node: Node) => void;
@@ -27,8 +55,17 @@ interface CanvasStore {
 
   // Pipeline operations
   addProposedPipeline: (pipeline: ProposedPipeline) => void;
+  setPipelineFromImport: (pipeline: ProposedPipeline) => void;
+  applyImportToExistingPipeline: (pipeline: ProposedPipeline, options?: ApplyImportOptions) => void;
   confirmAllProposed: () => void;
   clearProposed: () => void;
+
+  // Snap code panel focus to canvas: when a code cell is focused, request viewport to fit this node
+  focusNodeIdForView: string | null;
+  setFocusNodeIdForView: (id: string | null) => void;
+
+  // Selection (canvas + code panel): set selected node IDs so both surfaces stay in sync
+  setSelectedNodeIds: (nodeIds: string[]) => void;
 
   // React Flow callbacks
   onNodesChange: OnNodesChange;
@@ -39,6 +76,45 @@ interface CanvasStore {
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: [],
   edges: [],
+
+  showImportModal: false,
+  setShowImportModal: (show) => set({ showImportModal: show }),
+
+  showPrompt: false,
+  setShowPrompt: (show) => set({ showPrompt: show }),
+
+  baselineCode: null,
+  baselineLanguage: null,
+  setBaselineFromImport: (code, language) =>
+    set({ baselineCode: code, baselineLanguage: language }),
+  setBaselineFromPin: (code, language) =>
+    set({ baselineCode: code, baselineLanguage: language }),
+  clearBaseline: () => set({ baselineCode: null, baselineLanguage: null }),
+
+  baselineByNodeId: {},
+  setBaselineForSelection: () =>
+    set((state) => {
+      const selected = state.nodes.filter((n) => n.selected);
+      if (selected.length === 0) return state;
+      const next: Record<string, { config: Record<string, unknown>; customCode?: string }> = {
+        ...state.baselineByNodeId,
+      };
+      for (const node of selected) {
+        const data = (node.data || {}) as Record<string, unknown>;
+        const { state: _nodeState, label: _l, error: _e, inputRowCount: _i, outputRowCount: _o, ...config } = data;
+        next[node.id] = {
+          config: { ...config },
+          customCode: typeof data.customCode === 'string' ? data.customCode : undefined,
+        };
+      }
+      return { baselineByNodeId: next };
+    }),
+  clearNodeBaseline: (nodeId) =>
+    set((state) => {
+      const { [nodeId]: _, ...rest } = state.baselineByNodeId;
+      return { baselineByNodeId: rest };
+    }),
+  clearAllNodeBaselines: () => set({ baselineByNodeId: {} }),
 
   addNode: (node) =>
     set((state) => ({
@@ -55,12 +131,16 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     })),
 
   removeNode: (id) =>
-    set((state) => ({
-      nodes: state.nodes.filter((node) => node.id !== id),
-      edges: state.edges.filter(
-        (edge) => edge.source !== id && edge.target !== id
-      ),
-    })),
+    set((state) => {
+      const { [id]: _, ...baselineRest } = state.baselineByNodeId;
+      return {
+        nodes: state.nodes.filter((node) => node.id !== id),
+        edges: state.edges.filter(
+          (edge) => edge.source !== id && edge.target !== id
+        ),
+        baselineByNodeId: baselineRest,
+      };
+    }),
 
   confirmNode: (id) =>
     set((state) => ({
@@ -89,6 +169,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   addProposedPipeline: (pipeline) => {
     const { nodes: existingNodes, edges: existingEdges } = get();
+    const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
 
     // Find DataSource node to connect to
     const dataSourceNode = existingNodes.find((n) => n.type === 'dataSource');
@@ -102,15 +183,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
     pipeline.nodes.forEach((nodeConfig, index) => {
       const nodeId = `proposed-${Date.now()}-${index}`;
+      const type = nodeConfig.type;
+      const supportsCodeMode =
+        type !== 'dataSource' && type !== 'transform';
 
       newNodes.push({
         id: nodeId,
-        type: nodeConfig.type,
+        type,
         position: { x: xOffset, y: dataSourceNode.position.y },
         data: {
           state: 'proposed' as const,
-          label: nodeConfig.type.charAt(0).toUpperCase() + nodeConfig.type.slice(1),
+          label: type.charAt(0).toUpperCase() + type.slice(1),
           ...nodeConfig.config,
+          ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
         },
       });
 
@@ -131,6 +216,181 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       nodes: [...existingNodes, ...newNodes],
       edges: [...existingEdges, ...newEdges],
     });
+  },
+
+  setPipelineFromImport: (pipeline) => {
+    const { nodes: existingNodes, edges: existingEdges } = get();
+    const pipelineNodes = pipeline.nodes || [];
+    if (pipelineNodes.length === 0) return;
+
+    const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
+    const firstIsDataSource = pipelineNodes[0]?.type === 'dataSource';
+    const existingDataSource = existingNodes.find((n) => n.type === 'dataSource');
+
+    const basePosition = { x: 120, y: 120 };
+    let xOffset = basePosition.x;
+    const yPos = basePosition.y;
+
+    const newNodes: Node[] = [];
+    const newEdges: Edge[] = [];
+    const timestamp = Date.now();
+
+    let previousNodeId: string;
+
+    if (firstIsDataSource && pipelineNodes[0]) {
+      const dsConfig = pipelineNodes[0].config || {};
+      const dsId = `import-${timestamp}-0`;
+      newNodes.push({
+        id: dsId,
+        type: 'dataSource',
+        position: { x: xOffset, y: yPos },
+        data: {
+          state: 'proposed' as const,
+          label: 'Data Source',
+          ...dsConfig,
+        },
+      });
+      previousNodeId = dsId;
+      xOffset += 320;
+    } else if (existingDataSource) {
+      previousNodeId = existingDataSource.id;
+      xOffset = existingDataSource.position.x + 320;
+    } else {
+      const dsId = `import-${timestamp}-0`;
+      newNodes.push({
+        id: dsId,
+        type: 'dataSource',
+        position: { x: xOffset, y: yPos },
+        data: {
+          state: 'proposed' as const,
+          label: 'Data Source',
+        },
+      });
+      previousNodeId = dsId;
+      xOffset += 320;
+    }
+
+    const nodesToAdd = firstIsDataSource ? pipelineNodes.slice(1) : pipelineNodes;
+    nodesToAdd.forEach((nodeConfig, index) => {
+      const nodeId = `import-${timestamp}-${index + (firstIsDataSource ? 1 : 0)}`;
+      const type = nodeConfig.type;
+      const supportsCodeMode =
+        type !== 'dataSource' && type !== 'transform';
+
+      newNodes.push({
+        id: nodeId,
+        type,
+        position: { x: xOffset, y: yPos },
+        data: {
+          state: 'proposed' as const,
+          label: type.charAt(0).toUpperCase() + type.slice(1),
+          ...nodeConfig.config,
+          ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
+        },
+      });
+      newEdges.push({
+        id: `edge-${previousNodeId}-${nodeId}`,
+        source: previousNodeId,
+        target: nodeId,
+        type: 'dataFlow',
+        animated: true,
+        style: { opacity: 0.5 },
+      });
+      previousNodeId = nodeId;
+      xOffset += 320;
+    });
+
+    set({
+      nodes: [...existingNodes, ...newNodes],
+      edges: [...existingEdges, ...newEdges],
+    });
+  },
+
+  applyImportToExistingPipeline: (pipeline, options) => {
+    const { nodes: existingNodes, edges: existingEdges } = get();
+    const pipelineNodes = pipeline.nodes || [];
+    if (pipelineNodes.length === 0) return;
+
+    const orderedNodes = topologicalSort(existingNodes, existingEdges);
+    if (orderedNodes.length === 0) return;
+
+    const upToIndex = options?.upToIndex;
+    const updateLimit =
+      upToIndex !== undefined
+        ? Math.min(pipelineNodes.length, orderedNodes.length, upToIndex + 1)
+        : Math.min(pipelineNodes.length, orderedNodes.length);
+
+    const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
+
+    const updatedNodes = existingNodes.map((node) => {
+      const idx = orderedNodes.findIndex((n) => n.id === node.id);
+      if (idx < 0 || idx >= updateLimit) return node;
+      const imp = pipelineNodes[idx];
+      const type = imp.type;
+      const config = (imp.config || {}) as Record<string, unknown>;
+      const supportsCodeMode = type !== 'dataSource' && type !== 'transform';
+      const data = { ...node.data, ...config } as Record<string, unknown>;
+      if ((node.data as Record<string, unknown>)?.state !== undefined)
+        data.state = (node.data as Record<string, unknown>).state;
+      if ((node.data as Record<string, unknown>)?.label !== undefined)
+        data.label = (node.data as Record<string, unknown>).label;
+      if ((node.data as Record<string, unknown>)?.isCodeMode !== undefined)
+        data.isCodeMode = (node.data as Record<string, unknown>).isCodeMode;
+      if (data.label === undefined)
+        data.label = type.charAt(0).toUpperCase() + type.slice(1);
+      if (data.isCodeMode === undefined && supportsCodeMode)
+        data.isCodeMode = showCodeByDefault;
+      return { ...node, type, data };
+    });
+
+    if (
+      upToIndex === undefined &&
+      pipelineNodes.length > orderedNodes.length
+    ) {
+      const lastNode = orderedNodes[orderedNodes.length - 1];
+      let xOffset = lastNode.position.x + 320;
+      const yPos = lastNode.position.y;
+      let previousNodeId = lastNode.id;
+      const timestamp = Date.now();
+      const appendNodes: Node[] = [];
+      const appendEdges: Edge[] = [];
+      const toAdd = pipelineNodes.slice(orderedNodes.length);
+
+      toAdd.forEach((nodeConfig, index) => {
+        const nodeId = `import-${timestamp}-${index}`;
+        const type = nodeConfig.type;
+        const supportsCodeMode =
+          type !== 'dataSource' && type !== 'transform';
+        appendNodes.push({
+          id: nodeId,
+          type,
+          position: { x: xOffset, y: yPos },
+          data: {
+            state: 'proposed' as const,
+            label: type.charAt(0).toUpperCase() + type.slice(1),
+            ...nodeConfig.config,
+            ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
+          },
+        });
+        appendEdges.push({
+          id: `edge-${previousNodeId}-${nodeId}`,
+          source: previousNodeId,
+          target: nodeId,
+          type: 'dataFlow',
+          animated: true,
+          style: { opacity: 0.5 },
+        });
+        previousNodeId = nodeId;
+        xOffset += 320;
+      });
+
+      set({
+        nodes: [...updatedNodes, ...appendNodes],
+        edges: [...existingEdges, ...appendEdges],
+      });
+    } else {
+      set({ nodes: updatedNodes });
+    }
   },
 
   confirmAllProposed: () =>
@@ -161,6 +421,17 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         ),
       };
     }),
+
+  focusNodeIdForView: null,
+  setFocusNodeIdForView: (id) => set({ focusNodeIdForView: id }),
+
+  setSelectedNodeIds: (nodeIds) =>
+    set((state) => ({
+      nodes: state.nodes.map((node) => ({
+        ...node,
+        selected: nodeIds.includes(node.id),
+      })),
+    })),
 
   onNodesChange: (changes) =>
     set((state) => ({

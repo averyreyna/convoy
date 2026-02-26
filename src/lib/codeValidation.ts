@@ -1,5 +1,6 @@
 /**
- * Utilities for validating user-written JavaScript code before execution.
+ * Utilities for validating user-written code before execution.
+ * Supports Python only (Convoy is Python-first).
  */
 
 export interface ValidationResult {
@@ -12,59 +13,63 @@ export interface ValidationResult {
 }
 
 /**
- * Validate JavaScript syntax by attempting to parse it with `new Function()`.
- * Does NOT execute the code — only checks that it parses.
+ * Check for balanced brackets/parentheses/braces in Python code.
+ * Best-effort only; does not skip string contents, so may false-positive inside strings.
+ */
+function checkBalancedDelimiters(code: string): ValidationResult {
+  const stack: { char: string; line: number; col: number }[] = [];
+  const pairs: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
+  const open = new Set(['(', '[', '{']);
+  const lines = code.split('\n');
+
+  for (let lineNum = 1; lineNum <= lines.length; lineNum++) {
+    const line = lines[lineNum - 1];
+    for (let col = 0; col < line.length; col++) {
+      const c = line[col];
+      if (open.has(c)) {
+        stack.push({ char: c, line: lineNum, col: col + 1 });
+      } else if (pairs[c]) {
+        if (stack.length === 0) {
+          return {
+            valid: false,
+            error: `Unmatched "${c}"`,
+            line: lineNum,
+            column: col + 1,
+          };
+        }
+        const top = stack.pop()!;
+        if (top.char !== pairs[c]) {
+          return {
+            valid: false,
+            error: `Mismatched "${top.char}" and "${c}"`,
+            line: top.line,
+            column: top.col,
+          };
+        }
+      }
+    }
+  }
+
+  if (stack.length > 0) {
+    const top = stack[stack.length - 1];
+    return {
+      valid: false,
+      error: `Unclosed "${top.char}"`,
+      line: top.line,
+      column: top.col,
+    };
+  }
+  return { valid: true };
+}
+
+/**
+ * Validate Python syntax with a lightweight check (balanced delimiters).
+ * Full AST validation would require Pyodide or a Python parser in JS.
  */
 export function validateSyntax(code: string): ValidationResult {
   if (!code || code.trim() === '') {
     return { valid: true };
   }
 
-  try {
-    // Wrap in function context (same as the transform executor)
-    new Function('rows', 'columns', `"use strict";\n${code}`);
-    return { valid: true };
-  } catch (err) {
-    if (err instanceof SyntaxError) {
-      const { line, column } = extractLineColumn(err);
-      return {
-        valid: false,
-        error: err.message,
-        line: line !== undefined ? line - 1 : undefined, // subtract 1 for the "use strict" wrapper line
-        column,
-      };
-    }
-    return {
-      valid: false,
-      error: err instanceof Error ? err.message : 'Unknown syntax error',
-    };
-  }
-}
-
-/**
- * Try to extract line/column from a SyntaxError.
- * Different JS engines format this differently.
- */
-function extractLineColumn(err: SyntaxError): {
-  line?: number;
-  column?: number;
-} {
-  // V8 (Chrome): "Unexpected token '}' at line 3, column 5"
-  // or the error might have lineNumber/columnNumber properties (SpiderMonkey)
-  const errAny = err as unknown as Record<string, unknown>;
-  if (typeof errAny.lineNumber === 'number') {
-    return {
-      line: errAny.lineNumber as number,
-      column: (errAny.columnNumber as number) ?? undefined,
-    };
-  }
-
-  // Try to extract from message
-  const lineMatch = String(err.message).match(/line (\d+)/i);
-  const colMatch = String(err.message).match(/column (\d+)/i);
-
-  return {
-    line: lineMatch ? Number(lineMatch[1]) : undefined,
-    column: colMatch ? Number(colMatch[1]) : undefined,
-  };
+  return checkBalancedDelimiters(code);
 }

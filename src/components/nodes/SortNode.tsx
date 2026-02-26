@@ -12,7 +12,7 @@ type SortNodeProps = NodeProps & {
   data: SortNodeData;
 };
 
-export function SortNode({ id, data }: SortNodeProps) {
+export function SortNode({ id, data, selected }: SortNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -37,34 +37,22 @@ export function SortNode({ id, data }: SortNodeProps) {
   const columns = upstreamData?.columns ?? [];
   const nodeOutput = useDataStore((s) => s.nodeOutputs[id]);
 
-  // Code view handlers
-  const handleToggleCodeMode = useCallback(() => {
-    updateNode(id, { isCodeMode: !data.isCodeMode });
-  }, [id, data.isCodeMode, updateNode]);
-
-  const handleCodeChange = useCallback(
-    (code: string) => {
-      updateNode(id, { customCode: code, isCodeMode: true });
-    },
-    [id, updateNode]
-  );
-
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Sort"
       icon={<ArrowUpDown size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}
       nodeType="sort"
       nodeConfig={config}
-      isCodeMode={data.isCodeMode}
+      inputRowCount={data.inputRowCount}
+      outputRowCount={data.outputRowCount}
       customCode={data.customCode}
-      onToggleCodeMode={handleToggleCodeMode}
-      onCodeChange={handleCodeChange}
-      executionError={data.error}
-      upstreamColumns={(upstreamData?.columns ?? []).map((c) => c.name)}
+      errorMessage={data.error}
     >
       <div className="space-y-2">
         {/* Column selector */}

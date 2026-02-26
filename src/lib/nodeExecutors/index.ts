@@ -1,19 +1,6 @@
 import type { DataFrame } from '@/types';
-import { executeFilter, type FilterConfig } from './filterExecutor';
-import { executeGroupBy, type GroupByConfig } from './groupByExecutor';
-import { executeSort, type SortConfig } from './sortExecutor';
-import { executeSelect, type SelectConfig } from './selectExecutor';
-import { executeTransform, type TransformConfig } from './transformExecutor';
-import { executeComputedColumn, type ComputedColumnConfig } from './computedColumnExecutor';
-import { executeReshape, type ReshapeConfig } from './reshapeExecutor';
-
-export { executeFilter } from './filterExecutor';
-export { executeGroupBy } from './groupByExecutor';
-export { executeSort } from './sortExecutor';
-export { executeSelect } from './selectExecutor';
-export { executeTransform } from './transformExecutor';
-export { executeComputedColumn } from './computedColumnExecutor';
-export { executeReshape } from './reshapeExecutor';
+import { generateNodeCode } from '@/lib/codeGenerators';
+import { runPythonWithDataFrame } from '@/lib/pythonRunner';
 
 export type { FilterConfig } from './filterExecutor';
 export type { GroupByConfig } from './groupByExecutor';
@@ -23,44 +10,35 @@ export type { TransformConfig } from './transformExecutor';
 export type { ComputedColumnConfig } from './computedColumnExecutor';
 export type { ReshapeConfig } from './reshapeExecutor';
 
+/** Node types that perform a transformation and run through Python */
+const PYTHON_NODE_TYPES = new Set([
+  'filter',
+  'groupBy',
+  'sort',
+  'select',
+  'transform',
+  'computedColumn',
+  'reshape',
+]);
+
 /**
- * Execute a node's transformation given its type, input data, config,
- * and optional custom code.
- *
- * When customCode is provided, it takes priority over config-based execution
- * and runs through the sandboxed Function executor.
- *
- * Returns the transformed DataFrame or throws an error.
+ * Execute a node's transformation via in-browser Python (Pyodide).
+ * Generates or uses custom Python code, runs it with the input dataframe as `df`, returns the result.
  */
-export function executeNode(
+export async function executeNode(
   nodeType: string,
   input: DataFrame,
   config: Record<string, unknown>,
   customCode?: string
-): DataFrame {
-  // If the user has written custom code, run it through the transform executor
-  // regardless of node type (except chart/dataSource which don't execute)
-  if (customCode) {
-    return executeTransform(input, { customCode });
+): Promise<DataFrame> {
+  if (!PYTHON_NODE_TYPES.has(nodeType)) {
+    return input;
   }
 
-  switch (nodeType) {
-    case 'filter':
-      return executeFilter(input, config as FilterConfig);
-    case 'groupBy':
-      return executeGroupBy(input, config as GroupByConfig);
-    case 'sort':
-      return executeSort(input, config as SortConfig);
-    case 'select':
-      return executeSelect(input, config as SelectConfig);
-    case 'transform':
-      return executeTransform(input, config as TransformConfig);
-    case 'computedColumn':
-      return executeComputedColumn(input, config as ComputedColumnConfig);
-    case 'reshape':
-      return executeReshape(input, config as ReshapeConfig);
-    default:
-      // For unknown node types, pass through
-      return input;
-  }
+  const code =
+    nodeType === 'transform' && customCode && customCode.trim() !== ''
+      ? customCode
+      : generateNodeCode(nodeType, config);
+
+  return runPythonWithDataFrame(input, code);
 }

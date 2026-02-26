@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -8,68 +8,28 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { Wand2 } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { nodeTypes } from '@/components/nodes';
 import { edgeTypes } from '@/components/edges';
 import { CanvasControls } from './CanvasControls';
-import { nodeTypeInfos } from '@/components/nodes';
 import { PipelinePrompt } from './PipelinePrompt';
+import { ImportFromPythonModal } from './ImportFromPythonModal';
 import { ProposedPipelineBanner } from './ProposedPipelineBanner';
-
-let nodeIdCounter = 0;
-function getNextNodeId() {
-  nodeIdCounter += 1;
-  return `node-${nodeIdCounter}`;
-}
 
 export function ConvoyCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
-  const [showPrompt, setShowPrompt] = useState(false);
+  const showPrompt = useCanvasStore((s) => s.showPrompt);
+  const setShowPrompt = useCanvasStore((s) => s.setShowPrompt);
+  const showImportModal = useCanvasStore((s) => s.showImportModal);
+  const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
-  const addNode = useCanvasStore((s) => s.addNode);
-
-  const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const onDrop = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-
-      const type = event.dataTransfer.getData('application/reactflow');
-      if (!type || !reactFlowInstance.current) return;
-
-      const nodeInfo = nodeTypeInfos.find((n) => n.type === type);
-      if (!nodeInfo) return;
-
-      // Get the position where the node was dropped
-      const position = reactFlowInstance.current.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-
-      const newNode = {
-        id: getNextNodeId(),
-        type,
-        position,
-        data: {
-          ...nodeInfo.defaultData,
-        },
-      };
-
-      addNode(newNode);
-    },
-    [addNode]
-  );
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstance.current = instance;
@@ -84,21 +44,22 @@ export function ConvoyCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onInit={onInit}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{
           type: 'dataFlow',
           animated: true,
         }}
-        fitView
         proOptions={{ hideAttribution: true }}
         className="bg-gray-50"
         snapToGrid
         snapGrid={[16, 16]}
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
         deleteKeyCode={['Backspace', 'Delete']}
+        selectionOnDrag
+        selectionKeyCode="Shift"
+        multiSelectionKeyCode="Shift"
+        defaultViewport={{ x: 0, y: 0, zoom: 0.85 }}
       >
         <Background
           variant={BackgroundVariant.Dots}
@@ -130,49 +91,10 @@ export function ConvoyCanvas() {
         <PipelinePrompt onClose={() => setShowPrompt(false)} />
       )}
 
-      {/* Empty state overlay — shown when no nodes exist */}
-      {nodes.length === 0 && !showPrompt && (
-        <EmptyCanvasOverlay onOpenPrompt={() => setShowPrompt(true)} />
+      {/* Import from Python modal */}
+      {showImportModal && (
+        <ImportFromPythonModal onClose={() => setShowImportModal(false)} />
       )}
-    </div>
-  );
-}
-
-// ─── Empty Canvas Overlay ───────────────────────────────────────────────────
-
-function EmptyCanvasOverlay({ onOpenPrompt }: { onOpenPrompt: () => void }) {
-  return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className="pointer-events-auto text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
-          <svg
-            className="h-7 w-7 text-blue-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z"
-            />
-          </svg>
-        </div>
-        <h3 className="mb-1 text-base font-semibold text-gray-700">
-          Start building your pipeline
-        </h3>
-        <p className="mb-4 max-w-xs text-sm text-gray-500">
-          Drag nodes from the sidebar, or describe what you want to build a pipeline.
-        </p>
-        <button
-          onClick={onOpenPrompt}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-600 hover:shadow-md active:bg-blue-700"
-        >
-          <Wand2 size={18} />
-          Build from description
-        </button>
-      </div>
     </div>
   );
 }

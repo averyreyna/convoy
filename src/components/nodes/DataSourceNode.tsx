@@ -57,7 +57,7 @@ function inferColumnType(value: unknown): Column['type'] {
   return 'string';
 }
 
-export function DataSourceNode({ id, data }: DataSourceNodeProps) {
+export function DataSourceNode({ id, data, selected }: DataSourceNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const setNodeData = useDataStore((s) => s.setNodeData);
@@ -250,8 +250,10 @@ export function DataSourceNode({ id, data }: DataSourceNodeProps) {
       setParseError(null);
 
       try {
-        const res = await fetch(sample.path);
-        if (!res.ok) throw new Error(`Failed to load sample: ${res.status}`);
+        const base = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '') || '';
+        const url = base + (sample.path.startsWith('/') ? sample.path : `/${sample.path}`);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Failed to load sample: ${res.status} ${res.statusText}`);
         const csvText = await res.text();
         const fileName = sample.path.split('/').pop() || `${sample.id}.csv`;
         processCSVText(csvText, fileName);
@@ -342,9 +344,11 @@ export function DataSourceNode({ id, data }: DataSourceNodeProps) {
 
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Data Source"
       icon={<Table size={16} />}
+      selected={selected}
       inputs={0}
       outputs={1}
       onConfirm={() => confirmNode(id)}

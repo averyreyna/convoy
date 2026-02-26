@@ -5,7 +5,7 @@ import { generateNodeCode } from './codeGenerators';
  * Walk the node graph in topological order (DataSource → ... → Chart)
  * and return the ordered list of nodes.
  */
-function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
+export function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
   // Build adjacency list and in-degree map
   const adj = new Map<string, string[]>();
   const inDegree = new Map<string, number>();
@@ -65,273 +65,6 @@ function getNodeCode(node: Node): { code: string; nodeType: string; label: strin
 
   const code = generateNodeCode(nodeType, config);
   return { code, nodeType, label };
-}
-
-// ─── JavaScript Export ──────────────────────────────────────────────────────
-
-/**
- * Build a mapping from node IDs to clean variable names.
- * The first data variable is "data"; subsequent transformations get
- * descriptive names like "filtered", "grouped", "sorted", etc.
- */
-function buildVariableNames(sorted: Node[]): Map<string, string> {
-  const varMap = new Map<string, string>();
-  const usedNames = new Set<string>();
-
-  function uniqueName(base: string): string {
-    if (!usedNames.has(base)) {
-      usedNames.add(base);
-      return base;
-    }
-    let i = 2;
-    while (usedNames.has(`${base}${i}`)) i++;
-    usedNames.add(`${base}${i}`);
-    return `${base}${i}`;
-  }
-
-  for (const node of sorted) {
-    const nodeType = node.type || 'unknown';
-    switch (nodeType) {
-      case 'dataSource':
-        varMap.set(node.id, uniqueName('data'));
-        break;
-      case 'filter':
-        varMap.set(node.id, uniqueName('filtered'));
-        break;
-      case 'groupBy':
-        varMap.set(node.id, uniqueName('grouped'));
-        break;
-      case 'sort':
-        varMap.set(node.id, uniqueName('sorted'));
-        break;
-      case 'select':
-        varMap.set(node.id, uniqueName('selected'));
-        break;
-      case 'transform':
-        varMap.set(node.id, uniqueName('transformed'));
-        break;
-      case 'computedColumn':
-        varMap.set(node.id, uniqueName('computed'));
-        break;
-      case 'reshape':
-        varMap.set(node.id, uniqueName('reshaped'));
-        break;
-      case 'chart':
-        varMap.set(node.id, 'chart');
-        break;
-      default:
-        varMap.set(node.id, uniqueName('step'));
-    }
-  }
-
-  return varMap;
-}
-
-export function exportAsJavaScript(nodes: Node[], edges: Edge[]): string {
-  const sorted = topologicalSort(nodes, edges);
-  const sections: string[] = [];
-  const varNames = buildVariableNames(sorted);
-
-  // Build a map from target node → source node (for finding upstream variable)
-  const parentMap = new Map<string, string>();
-  for (const edge of edges) {
-    parentMap.set(edge.target, edge.source);
-  }
-
-  sections.push(`// Convoy Pipeline — exported D3.js script
-// Generated on ${new Date().toISOString()}
-// Drop this into an HTML file with <script src="https://d3js.org/d3.v7.min.js">
-`);
-
-  sections.push(`async function main() {`);
-
-  for (const node of sorted) {
-    const { code, nodeType, label } = getNodeCode(node);
-    const varName = varNames.get(node.id) || 'step';
-    const parentId = parentMap.get(node.id);
-    const inputVar = parentId ? varNames.get(parentId) || 'data' : 'data';
-
-    if (nodeType === 'dataSource') {
-      const fileName = (node.data as Record<string, unknown>).fileName as string | undefined;
-      if (fileName) {
-        sections.push(`  // Load data
-  const ${varName} = await d3.csv(${JSON.stringify(fileName)}, d3.autoType);
-`);
-      } else {
-        sections.push(`  // TODO: Replace with your data source
-  const ${varName} = await d3.csv("your-file.csv", d3.autoType);
-`);
-      }
-    } else if (nodeType === 'chart') {
-      // Chart node — inline the D3 chart code, referencing the upstream variable
-      sections.push(`  // Chart: ${label}
-  const chartData = ${inputVar};
-
-  ${code.split('\n').join('\n  ').replace(/\bdata\b/g, 'chartData')}
-`);
-    } else if (nodeType === 'filter') {
-      // Extract the clean D3 code from the generated code
-      const data = node.data as Record<string, unknown>;
-      const col = data.column as string;
-      const op = data.operator as string;
-      const val = data.value as string;
-
-      if (col && op) {
-        const numValue = Number(val);
-        const isNumeric = val !== '' && !isNaN(numValue);
-
-        let condition: string;
-        switch (op) {
-          case 'eq':
-            condition = isNumeric ? `+d[${JSON.stringify(col)}] === ${numValue}` : `d[${JSON.stringify(col)}] === ${JSON.stringify(val)}`;
-            break;
-          case 'neq':
-            condition = isNumeric ? `+d[${JSON.stringify(col)}] !== ${numValue}` : `d[${JSON.stringify(col)}] !== ${JSON.stringify(val)}`;
-            break;
-          case 'gt':
-            condition = `+d[${JSON.stringify(col)}] > ${numValue}`;
-            break;
-          case 'lt':
-            condition = `+d[${JSON.stringify(col)}] < ${numValue}`;
-            break;
-          case 'contains':
-            condition = `String(d[${JSON.stringify(col)}] ?? "").toLowerCase().includes(${JSON.stringify(String(val).toLowerCase())})`;
-            break;
-          case 'startsWith':
-            condition = `String(d[${JSON.stringify(col)}] ?? "").toLowerCase().startsWith(${JSON.stringify(String(val).toLowerCase())})`;
-            break;
-          default:
-            condition = 'true';
-        }
-        sections.push(`  // ${label}
-  const ${varName} = d3.filter(${inputVar}, d => ${condition});
-`);
-      } else {
-        sections.push(`  // ${label} (not configured)
-  const ${varName} = ${inputVar};
-`);
-      }
-    } else if (nodeType === 'groupBy') {
-      const data = node.data as Record<string, unknown>;
-      const groupCol = data.groupByColumn as string;
-      const aggCol = (data.aggregateColumn as string) || groupCol;
-      const agg = data.aggregation as string;
-
-      if (groupCol && agg) {
-        const resultColName = agg === 'count' ? 'count' : `${agg}_${aggCol}`;
-        let rollupFn: string;
-        switch (agg) {
-          case 'count': rollupFn = `v => v.length`; break;
-          case 'sum': rollupFn = `v => d3.sum(v, d => +d[${JSON.stringify(aggCol)}])`; break;
-          case 'avg': rollupFn = `v => d3.mean(v, d => +d[${JSON.stringify(aggCol)}])`; break;
-          case 'min': rollupFn = `v => d3.min(v, d => +d[${JSON.stringify(aggCol)}])`; break;
-          case 'max': rollupFn = `v => d3.max(v, d => +d[${JSON.stringify(aggCol)}])`; break;
-          default: rollupFn = `v => v.length`;
-        }
-
-        sections.push(`  // ${label}
-  const ${varName} = d3.flatRollup(${inputVar}, ${rollupFn}, d => d[${JSON.stringify(groupCol)}])
-    .map(([key, val]) => ({ ${JSON.stringify(groupCol).slice(1, -1)}: key, ${JSON.stringify(resultColName).slice(1, -1)}: val }));
-`);
-      } else {
-        sections.push(`  // ${label} (not configured)
-  const ${varName} = ${inputVar};
-`);
-      }
-    } else if (nodeType === 'sort') {
-      const data = node.data as Record<string, unknown>;
-      const col = data.column as string;
-      const dir = data.direction as string;
-
-      if (col) {
-        const compareFn = dir === 'desc' ? 'd3.descending' : 'd3.ascending';
-        sections.push(`  // ${label}
-  const ${varName} = d3.sort(${inputVar}, (a, b) => ${compareFn}(a[${JSON.stringify(col)}], b[${JSON.stringify(col)}]));
-`);
-      } else {
-        sections.push(`  // ${label} (not configured)
-  const ${varName} = ${inputVar};
-`);
-      }
-    } else if (nodeType === 'select') {
-      const data = node.data as Record<string, unknown>;
-      const cols = data.columns as string[] | undefined;
-
-      if (cols && cols.length > 0) {
-        const allSimple = cols.every((c) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(c));
-        if (allSimple) {
-          sections.push(`  // ${label}
-  const ${varName} = ${inputVar}.map(({ ${cols.join(', ')} }) => ({ ${cols.join(', ')} }));
-`);
-        } else {
-          const keys = cols.map((c) => JSON.stringify(c)).join(', ');
-          sections.push(`  // ${label}
-  const __keep = [${keys}];
-  const ${varName} = ${inputVar}.map(d => Object.fromEntries(__keep.map(k => [k, d[k]])));
-`);
-        }
-      } else {
-        sections.push(`  // ${label} (not configured)
-  const ${varName} = ${inputVar};
-`);
-      }
-    } else if (nodeType === 'computedColumn') {
-      const data = node.data as Record<string, unknown>;
-      const newCol = data.newColumnName as string;
-      const expression = data.expression as string;
-
-      if (newCol && expression) {
-        sections.push(`  // ${label}
-  const ${varName} = ${inputVar}.map(d => ({ ...d, ${JSON.stringify(newCol).slice(1, -1)}: ${expression} }));
-`);
-      } else {
-        sections.push(`  // ${label} (not configured)
-  const ${varName} = ${inputVar};
-`);
-      }
-    } else if (nodeType === 'reshape') {
-      const data = node.data as Record<string, unknown>;
-      const keyColumn = data.keyColumn as string;
-      const valueColumn = data.valueColumn as string;
-      const pivotColumns = data.pivotColumns as string[] | undefined;
-
-      if (keyColumn && valueColumn && pivotColumns && pivotColumns.length > 0) {
-        const pivotList = pivotColumns.map((c) => JSON.stringify(c)).join(', ');
-        sections.push(`  // ${label}
-  const __pivotCols = [${pivotList}];
-  const __keepCols = Object.keys(${inputVar}[0] || {}).filter(k => !__pivotCols.includes(k));
-  const ${varName} = ${inputVar}.flatMap(d => {
-    const base = Object.fromEntries(__keepCols.map(k => [k, d[k]]));
-    return __pivotCols.map(col => ({ ...base, ${JSON.stringify(keyColumn).slice(1, -1)}: col, ${JSON.stringify(valueColumn).slice(1, -1)}: d[col] }));
-  });
-`);
-      } else {
-        sections.push(`  // ${label} (not configured)
-  const ${varName} = ${inputVar};
-`);
-      }
-    } else {
-      // Generic transform: inline the custom code as a function
-      sections.push(`  // ${label}
-  const ${varName} = (() => {
-    const rows = ${inputVar};
-    ${code.split('\n').join('\n    ')}
-  })()?.rows ?? ${inputVar};
-`);
-    }
-  }
-
-  // Find the last non-chart variable for output
-  const lastNonChart = [...sorted].reverse().find((n) => n.type !== 'chart');
-  const outputVar = lastNonChart ? varNames.get(lastNonChart.id) || 'data' : 'data';
-
-  sections.push(`  console.log(\`Pipeline complete: \${${outputVar}.length} rows\`);
-  console.table(${outputVar}.slice(0, 5));
-}`);
-
-  sections.push(`\nmain();`);
-
-  return sections.join('\n');
 }
 
 // ─── Python Export ──────────────────────────────────────────────────────────
@@ -471,7 +204,7 @@ print(f"Sorted by ${column}")\n`);
 print(f"Selected ${cols.length} columns")\n`);
       }
     } else if (nodeType === 'transform') {
-      sections.push(`# Custom transform — translate the JavaScript code below to pandas:
+      sections.push(`# Custom transform — translate the custom code below to pandas:
 # ${(data.customCode as string || '// no custom code').split('\n').join('\n# ')}
 # TODO: Implement this transform in Python
 `);
@@ -500,19 +233,145 @@ function downloadFile(content: string, filename: string) {
 }
 
 /**
- * Export the pipeline as a downloadable script.
+ * Export the pipeline as a downloadable Python script.
  */
-export function downloadPipelineScript(
-  nodes: Node[],
-  edges: Edge[],
-  format: 'javascript' | 'python'
-) {
+export function downloadPipelineScript(nodes: Node[], edges: Edge[]) {
   const timestamp = Date.now();
-  if (format === 'javascript') {
-    const script = exportAsJavaScript(nodes, edges);
-    downloadFile(script, `convoy-pipeline-${timestamp}.js`);
-  } else {
-    const script = exportAsPython(nodes, edges);
-    downloadFile(script, `convoy-pipeline-${timestamp}.py`);
+  const script = exportAsPython(nodes, edges);
+  downloadFile(script, `convoy-pipeline-${timestamp}.py`);
+}
+
+/** Jupyter notebook cell (code). */
+interface NotebookCodeCell {
+  cell_type: 'code';
+  source: string[];
+  execution_count: null;
+  outputs: unknown[];
+  metadata: Record<string, unknown>;
+}
+
+/**
+ * Build Jupyter notebook (.ipynb) JSON from the pipeline.
+ */
+export function exportAsNotebookJson(nodes: Node[], edges: Edge[]): string {
+  const sorted = topologicalSort(nodes, edges);
+  const cells: NotebookCodeCell[] = [];
+
+  cells.push({
+    cell_type: 'code',
+    source: ['import pandas as pd\n'],
+    execution_count: null,
+    outputs: [],
+    metadata: {},
+  });
+
+  for (const node of sorted) {
+    const { code, label } = getNodeCode(node);
+    const lines = code.split('\n').map((line) => line + '\n');
+    if (lines.length > 0 && lines[lines.length - 1] === '\n') {
+      lines[lines.length - 1] = lines[lines.length - 1].slice(0, -1);
+    }
+    cells.push({
+      cell_type: 'code',
+      source: lines,
+      execution_count: null,
+      outputs: [],
+      metadata: { convoy_cell_label: label },
+    });
   }
+
+  const notebook = {
+    nbformat: 4,
+    nbformat_minor: 4,
+    metadata: {
+      kernelspec: {
+        display_name: 'Python 3',
+        language: 'python',
+        name: 'python3',
+      },
+      language_info: { name: 'python', version: '3' },
+    },
+    cells,
+  };
+  return JSON.stringify(notebook, null, 1);
+}
+
+/**
+ * Download the pipeline as a Jupyter notebook (.ipynb).
+ */
+export function downloadNotebook(nodes: Node[], edges: Edge[]) {
+  const timestamp = Date.now();
+  const json = exportAsNotebookJson(nodes, edges);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = `convoy-pipeline-${timestamp}.ipynb`;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Copy pipeline as Jupyter-style cells (each block separated by "# %%") for pasting into VS Code / Jupyter.
+ */
+export function copyAsJupyterCells(nodes: Node[], edges: Edge[]): string {
+  const sorted = topologicalSort(nodes, edges);
+  const parts: string[] = ['# %%\nimport pandas as pd\n'];
+  for (const node of sorted) {
+    const { code, label } = getNodeCode(node);
+    parts.push(`# %% ${label}\n${code}\n`);
+  }
+  return parts.join('\n');
+}
+
+/** Cell code + node type for building a runnable script. */
+export interface CellCode {
+  code: string;
+  nodeType: string;
+}
+
+/**
+ * Build a runnable Python script from an ordered list of cell codes.
+ * Prepends import pandas; optionally limits to cells 0..upToIndex (inclusive) for "Run cell".
+ */
+export function buildScriptFromCellCodes(
+  cells: CellCode[],
+  upToIndex?: number
+): string {
+  if (cells.length === 0) return '';
+  const end = upToIndex !== undefined ? Math.min(upToIndex + 1, cells.length) : cells.length;
+  const slice = cells.slice(0, end);
+  const body = slice.map((c) => c.code.trim()).join('\n\n');
+  const preamble = 'import pandas as pd\n\n';
+  return preamble + body;
+}
+
+/**
+ * Build a script safe to run in the browser (Pyodide). Data source cells are not executed
+ * (no pd.read_csv etc.) and are replaced with a placeholder so downstream cells receive
+ * an empty DataFrame with the same columns when columnNames is provided (avoids KeyError
+ * in sort_values, groupby, etc.). Use this for "Run all" / "Run cell"; use the full script for export and import.
+ */
+export function buildScriptForBrowserRun(
+  cells: CellCode[],
+  upToIndex?: number,
+  columnNames?: string[]
+): string {
+  if (cells.length === 0) return '';
+  const end = upToIndex !== undefined ? Math.min(upToIndex + 1, cells.length) : cells.length;
+  const slice = cells.slice(0, end);
+  const body = slice
+    .map((c) => {
+      if (c.nodeType === 'dataSource') {
+        if (columnNames?.length) {
+          const cols = columnNames.map((n) => JSON.stringify(n)).join(', ');
+          return `# Data source (file load skipped in browser)\ndf = pd.DataFrame(columns=[${cols}])`;
+        }
+        return '# Data source (file load skipped in browser)\ndf = pd.DataFrame()';
+      }
+      return c.code.trim();
+    })
+    .join('\n\n');
+  const preamble = 'import pandas as pd\n\n';
+  return preamble + body;
 }

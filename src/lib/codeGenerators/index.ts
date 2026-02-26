@@ -1,16 +1,10 @@
 /**
- * Code generators that produce D3-idiomatic JavaScript from node configurations.
- *
- * For transformation nodes (filter, groupBy, sort, select, transform), the generated
- * code is runnable: it receives `rows` and `columns` and returns `{ columns, rows }`.
- * The code view shows clean D3-style code using `data` as the variable name.
- *
- * For chart nodes, the code is informational D3.js JavaScript (not executed in-app).
- * For dataSource nodes, the code is informational D3.js JavaScript using d3.csv().
+ * Code generators that produce Jupyter-valid Python (pandas) from node configurations.
+ * Used by CodeView in nodes and can be used for pipeline export.
+ * All node types use Python; variable name for the active dataframe is "df".
  */
 
-/** All node types use JavaScript syntax in Monaco */
-const JS_NODE_TYPES = new Set([
+const PYTHON_NODE_TYPES = new Set([
   'filter',
   'groupBy',
   'sort',
@@ -26,7 +20,7 @@ const JS_NODE_TYPES = new Set([
  * Returns the Monaco editor language for a given node type.
  */
 export function getEditorLanguage(nodeType: string): string {
-  return JS_NODE_TYPES.has(nodeType) ? 'javascript' : 'javascript';
+  return PYTHON_NODE_TYPES.has(nodeType) ? 'python' : 'python';
 }
 
 export function generateNodeCode(
@@ -53,176 +47,93 @@ export function generateNodeCode(
     case 'reshape':
       return generateReshapeCode(config);
     default:
-      return `// Unknown node type: ${nodeType}\n// Configure the node to generate code`;
+      return `# Unknown node type: ${nodeType}\n# Configure the node to generate code`;
   }
 }
 
-// ─── D3-idiomatic JavaScript generators ──────────────────────────────────────
+// ─── Python (pandas) generators ─────────────────────────────────────────────
+
+/** Escape a string for use inside double-quoted Python string literal (backslash and quote). */
+function pyEscape(s: string): string {
+  return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+const FILTER_PLACEHOLDER = `# Filter node — configure column, condition, and value to generate code
+# df = df[<condition>]`;
 
 function generateFilterCode(config: Record<string, unknown>): string {
   const { column, operator, value } = config;
 
   if (!column || !operator) {
-    return `// Filter node — configure column and condition to generate code
-return { columns, rows };`;
+    return `# Filter node — configure column and condition to generate code
+# df = df[<condition>]`;
   }
 
-  const operatorLabels: Record<string, string> = {
-    eq: 'equals',
-    neq: 'does not equal',
-    gt: 'is greater than',
-    lt: 'is less than',
-    contains: 'contains',
-    startsWith: 'starts with',
+  // For comparison and string ops, value is required (empty value produces invalid code e.g. int64 vs str)
+  const valueStr = value !== undefined && value !== null ? String(value).trim() : '';
+  const needValue = ['eq', 'neq', 'gt', 'lt', 'contains', 'startsWith'].includes(operator as string);
+  if (needValue && valueStr === '') {
+    return FILTER_PLACEHOLDER;
+  }
+
+  const colStr = typeof column === 'string' ? column : String(column ?? '');
+  const colEscaped = pyEscape(colStr);
+
+  const numValue = Number(value);
+  const isNumeric = valueStr !== '' && !isNaN(numValue);
+  const opMap: Record<string, string> = {
+    eq: '==',
+    neq: '!=',
+    gt: '>',
+    lt: '<',
   };
 
-  const opLabel = operatorLabels[operator as string] || operator;
-  const numValue = Number(value);
-  const isNumeric = value !== '' && !isNaN(numValue);
-
-  let condition: string;
-  switch (operator) {
-    case 'eq':
-      condition = isNumeric
-        ? `+d[${JSON.stringify(column)}] === ${numValue}`
-        : `d[${JSON.stringify(column)}] === ${JSON.stringify(value)}`;
-      break;
-    case 'neq':
-      condition = isNumeric
-        ? `+d[${JSON.stringify(column)}] !== ${numValue}`
-        : `d[${JSON.stringify(column)}] !== ${JSON.stringify(value)}`;
-      break;
-    case 'gt':
-      condition = `+d[${JSON.stringify(column)}] > ${numValue}`;
-      break;
-    case 'lt':
-      condition = `+d[${JSON.stringify(column)}] < ${numValue}`;
-      break;
-    case 'contains':
-      condition = `String(d[${JSON.stringify(column)}] ?? "").toLowerCase().includes(${JSON.stringify(String(value).toLowerCase())})`;
-      break;
-    case 'startsWith':
-      condition = `String(d[${JSON.stringify(column)}] ?? "").toLowerCase().startsWith(${JSON.stringify(String(value).toLowerCase())})`;
-      break;
-    default:
-      condition = 'true';
+  if (operator === 'contains') {
+    return `df = df[df["${colEscaped}"].str.contains("${pyEscape(valueStr)}", case=False, na=False)]`;
   }
-
-  return `// Filter: keep rows where "${column}" ${opLabel} ${JSON.stringify(value)}
-const filtered = d3.filter(rows, d => ${condition});
-return { columns, rows: filtered };`;
+  if (operator === 'startsWith') {
+    return `df = df[df["${colEscaped}"].str.startswith("${pyEscape(valueStr)}", na=False)]`;
+  }
+  const op = opMap[operator as string] || '==';
+  const fmtVal = isNumeric ? String(numValue) : `"${pyEscape(valueStr)}"`;
+  return `df = df[df["${colEscaped}"] ${op} ${fmtVal}]`;
 }
 
 function generateGroupByCode(config: Record<string, unknown>): string {
   const { groupByColumn, aggregateColumn, aggregation } = config;
 
   if (!groupByColumn || !aggregation) {
-    return `// Group By node — configure grouping to generate code
-return { columns, rows };`;
+    return `# Group By node — configure grouping to generate code
+# df = df.groupby("column").agg(...).reset_index()`;
   }
 
-  const aggCol = aggregateColumn || groupByColumn;
-  const resultColName =
-    aggregation === 'count' ? 'count' : `${aggregation}_${aggCol}`;
-
-  const aggLabels: Record<string, string> = {
-    count: 'count',
-    sum: 'sum',
-    avg: 'average',
-    min: 'minimum',
-    max: 'maximum',
-  };
-  const aggLabel = aggLabels[aggregation as string] || aggregation;
-
-  let rollupFn: string;
-  switch (aggregation) {
-    case 'count':
-      rollupFn = `v => v.length`;
-      break;
-    case 'sum':
-      rollupFn = `v => d3.sum(v, d => +d[${JSON.stringify(aggCol)}])`;
-      break;
-    case 'avg':
-      rollupFn = `v => d3.mean(v, d => +d[${JSON.stringify(aggCol)}])`;
-      break;
-    case 'min':
-      rollupFn = `v => d3.min(v, d => +d[${JSON.stringify(aggCol)}])`;
-      break;
-    case 'max':
-      rollupFn = `v => d3.max(v, d => +d[${JSON.stringify(aggCol)}])`;
-      break;
-    default:
-      rollupFn = `v => v.length`;
-  }
-
-  return `// Group by "${groupByColumn}" and calculate ${aggLabel} of "${aggCol}"
-const grouped = d3.flatRollup(rows, ${rollupFn}, d => d[${JSON.stringify(groupByColumn)}]);
-const outRows = grouped.map(([key, val]) => ({ ${JSON.stringify(groupByColumn).slice(1, -1)}: key, ${JSON.stringify(resultColName).slice(1, -1)}: val }));
-const outCols = [
-  { name: ${JSON.stringify(groupByColumn)}, type: "string" },
-  { name: ${JSON.stringify(resultColName)}, type: "number" }
-];
-return { columns: outCols, rows: outRows };`;
+  const aggCol = (aggregateColumn as string) || groupByColumn;
+  const pandasAgg = aggregation === 'avg' ? 'mean' : (aggregation as string);
+  return `df = df.groupby("${groupByColumn}")["${aggCol}"].${pandasAgg}().reset_index()`;
 }
 
 function generateSortCode(config: Record<string, unknown>): string {
   const { column, direction } = config;
 
   if (!column) {
-    return `// Sort node — select a column to generate code
-return { columns, rows };`;
+    return `# Sort node — select a column to generate code
+# df = df.sort_values("column", ascending=True)`;
   }
 
   const ascending = direction !== 'desc';
-  const dirLabel = ascending ? 'ascending' : 'descending';
-  const compareFn = ascending ? 'd3.ascending' : 'd3.descending';
-
-  return `// Sort by "${column}" in ${dirLabel} order
-const sorted = d3.sort(rows, (a, b) => ${compareFn}(a[${JSON.stringify(column)}], b[${JSON.stringify(column)}]));
-return { columns, rows: sorted };`;
+  return `df = df.sort_values("${column}", ascending=${ascending ? 'True' : 'False'})`;
 }
 
 function generateSelectCode(config: Record<string, unknown>): string {
   const { columns: selectedColumns } = config as { columns?: string[] };
 
   if (!selectedColumns || selectedColumns.length === 0) {
-    return `// Select Columns node — choose columns to keep
-return { columns, rows };`;
+    return `# Select Columns node — choose columns to keep
+# df = df[["col1", "col2"]]`;
   }
 
-  // Use clean destructuring syntax
-  const destructured = selectedColumns.map((c) => {
-    // If the column name is a valid JS identifier, use it directly
-    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(c)) return c;
-    // Otherwise use computed property with alias
-    return `${JSON.stringify(c)}: ${c.replace(/[^a-zA-Z0-9_$]/g, '_')}`;
-  });
-  const aliases = selectedColumns.map((c) => {
-    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(c)) return c;
-    return c.replace(/[^a-zA-Z0-9_$]/g, '_');
-  });
-
-  // Check if all columns are simple identifiers for a cleaner output
-  const allSimple = selectedColumns.every((c) =>
-    /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(c)
-  );
-
-  if (allSimple) {
-    return `// Keep only: ${selectedColumns.join(', ')}
-const result = rows.map(({ ${selectedColumns.join(', ')} }) => ({ ${selectedColumns.join(', ')} }));
-const outCols = columns.filter(c => [${selectedColumns.map((c) => JSON.stringify(c)).join(', ')}].includes(c.name));
-return { columns: outCols, rows: result };`;
-  }
-
-  return `// Keep only: ${selectedColumns.join(', ')}
-const keep = [${selectedColumns.map((c) => JSON.stringify(c)).join(', ')}];
-const result = rows.map(d => {
-  const out = {};
-  for (const k of keep) out[k] = d[k];
-  return out;
-});
-const outCols = columns.filter(c => keep.includes(c.name));
-return { columns: outCols, rows: result };`;
+  const cols = selectedColumns.map((c) => JSON.stringify(c)).join(', ');
+  return `df = df[[${cols}]]`;
 }
 
 function generateTransformCode(config: Record<string, unknown>): string {
@@ -230,25 +141,20 @@ function generateTransformCode(config: Record<string, unknown>): string {
   if (customCode && typeof customCode === 'string') {
     return customCode;
   }
-  return `// The input data is available as 'rows' (array of objects)
-// and 'columns' (array of {name, type}).
-// Return { columns, rows } with your transformed data.
-
-return { columns, rows };`;
+  return `# Custom transform — input dataframe is in 'df'
+# Modify df in place or reassign: df = ...
+# Example: df = df.assign(new_col=df["a"] + df["b"])`;
 }
 
 function generateComputedColumnCode(config: Record<string, unknown>): string {
   const { newColumnName, expression } = config;
 
   if (!newColumnName || !expression) {
-    return `// Computed Column — configure a name and expression
-return { columns, rows };`;
+    return `# Computed Column — configure a name and expression
+# df["new_col"] = <expression>`;
   }
 
-  return `// Add computed column "${newColumnName}"
-const result = rows.map(d => ({ ...d, ${JSON.stringify(newColumnName).slice(1, -1)}: ${expression} }));
-const outCols = [...columns, { name: ${JSON.stringify(newColumnName)}, type: "number" }];
-return { columns: outCols, rows: result };`;
+  return `df["${newColumnName}"] = ${expression}`;
 }
 
 function generateReshapeCode(config: Record<string, unknown>): string {
@@ -259,279 +165,77 @@ function generateReshapeCode(config: Record<string, unknown>): string {
   };
 
   if (!keyColumn || !valueColumn || !pivotColumns || pivotColumns.length === 0) {
-    return `// Reshape — configure columns to unpivot (wide → long)
-return { columns, rows };`;
+    return `# Reshape — unpivot wide to long
+# df = pd.melt(df, id_vars=[...], value_vars=[...], var_name="...", value_name="...")`;
   }
 
-  return `// Reshape: unpivot ${pivotColumns.join(', ')} into "${keyColumn}" / "${valueColumn}"
-const keep = columns.filter(c => ![${pivotColumns.map((c) => JSON.stringify(c)).join(', ')}].includes(c.name)).map(c => c.name);
-const result = rows.flatMap(d => {
-  const base = {};
-  for (const k of keep) base[k] = d[k];
-  return [${pivotColumns.map((c) => JSON.stringify(c)).join(', ')}].map(col => ({
-    ...base,
-    ${JSON.stringify(keyColumn).slice(1, -1)}: col,
-    ${JSON.stringify(valueColumn).slice(1, -1)}: d[col]
-  }));
-});
-const outCols = [
-  ...columns.filter(c => keep.includes(c.name)),
-  { name: ${JSON.stringify(keyColumn)}, type: "string" },
-  { name: ${JSON.stringify(valueColumn)}, type: "number" }
-];
-return { columns: outCols, rows: result };`;
+  const pivotList = pivotColumns.map((c) => JSON.stringify(c)).join(', ');
+  return `df = pd.melt(df, id_vars=[c for c in df.columns if c not in [${pivotList}]], value_vars=[${pivotList}], var_name="${keyColumn}", value_name="${valueColumn}")`;
 }
-
-// ─── D3.js chart code generator (informational JavaScript) ──────────────────
 
 function generateChartCode(config: Record<string, unknown>): string {
   const { chartType, xAxis, yAxis } = config;
 
   if (!xAxis || !yAxis) {
-    return `// Chart node — configure axes to generate D3.js code`;
+    return `# Chart node — configure axes to generate matplotlib code`;
   }
 
   const type = (chartType as string) || 'bar';
 
-  const typeLabels: Record<string, string> = {
-    bar: 'bar',
-    line: 'line',
-    area: 'area',
-    scatter: 'scatter',
-    pie: 'pie',
-  };
-  const label = typeLabels[type] || 'bar';
-
-  // Common SVG setup — no require(), assumes d3 is available
-  const header = `// Create a ${label} chart of "${yAxis}" by "${xAxis}" using D3.js
-const width = 800;
-const height = 500;
-const margin = { top: 20, right: 30, bottom: 60, left: 60 };
-const innerW = width - margin.left - margin.right;
-const innerH = height - margin.top - margin.bottom;
-
-const svg = d3.select("#chart")
-  .append("svg")
-  .attr("width", width)
-  .attr("height", height);
-`;
-
   switch (type) {
     case 'bar':
-      return `${header}
-const g = svg.append("g")
-  .attr("transform", \`translate(\${margin.left},\${margin.top})\`);
-
-const x = d3.scaleBand()
-  .domain(data.map(d => d["${xAxis}"]))
-  .range([0, innerW])
-  .padding(0.2);
-
-const y = d3.scaleLinear()
-  .domain([0, d3.max(data, d => +d["${yAxis}"])])
-  .nice()
-  .range([innerH, 0]);
-
-g.append("g")
-  .attr("transform", \`translate(0,\${innerH})\`)
-  .call(d3.axisBottom(x))
-  .selectAll("text")
-  .attr("transform", "rotate(-45)")
-  .style("text-anchor", "end");
-
-g.append("g").call(d3.axisLeft(y));
-
-g.selectAll("rect")
-  .data(data)
-  .join("rect")
-  .attr("x", d => x(d["${xAxis}"]))
-  .attr("y", d => y(+d["${yAxis}"]))
-  .attr("width", x.bandwidth())
-  .attr("height", d => innerH - y(+d["${yAxis}"]))
-  .attr("fill", "#3b82f6")
-  .attr("rx", 3);`;
-
+      return `import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.bar(df["${xAxis}"], df["${yAxis}"])
+plt.xlabel("${xAxis}")
+plt.ylabel("${yAxis}")
+plt.title("${yAxis} by ${xAxis}")
+plt.tight_layout()
+plt.show()`;
     case 'line':
-      return `${header}
-const g = svg.append("g")
-  .attr("transform", \`translate(\${margin.left},\${margin.top})\`);
-
-const x = d3.scaleBand()
-  .domain(data.map(d => d["${xAxis}"]))
-  .range([0, innerW])
-  .padding(0.1);
-
-const y = d3.scaleLinear()
-  .domain([0, d3.max(data, d => +d["${yAxis}"])])
-  .nice()
-  .range([innerH, 0]);
-
-g.append("g")
-  .attr("transform", \`translate(0,\${innerH})\`)
-  .call(d3.axisBottom(x))
-  .selectAll("text")
-  .attr("transform", "rotate(-45)")
-  .style("text-anchor", "end");
-
-g.append("g").call(d3.axisLeft(y));
-
-const line = d3.line()
-  .x(d => x(d["${xAxis}"]) + x.bandwidth() / 2)
-  .y(d => y(+d["${yAxis}"]))
-  .curve(d3.curveMonotoneX);
-
-g.append("path")
-  .datum(data)
-  .attr("fill", "none")
-  .attr("stroke", "#3b82f6")
-  .attr("stroke-width", 2)
-  .attr("d", line);
-
-g.selectAll("circle")
-  .data(data)
-  .join("circle")
-  .attr("cx", d => x(d["${xAxis}"]) + x.bandwidth() / 2)
-  .attr("cy", d => y(+d["${yAxis}"]))
-  .attr("r", 3)
-  .attr("fill", "#3b82f6");`;
-
-    case 'area':
-      return `${header}
-const g = svg.append("g")
-  .attr("transform", \`translate(\${margin.left},\${margin.top})\`);
-
-const x = d3.scaleBand()
-  .domain(data.map(d => d["${xAxis}"]))
-  .range([0, innerW])
-  .padding(0.1);
-
-const y = d3.scaleLinear()
-  .domain([0, d3.max(data, d => +d["${yAxis}"])])
-  .nice()
-  .range([innerH, 0]);
-
-g.append("g")
-  .attr("transform", \`translate(0,\${innerH})\`)
-  .call(d3.axisBottom(x))
-  .selectAll("text")
-  .attr("transform", "rotate(-45)")
-  .style("text-anchor", "end");
-
-g.append("g").call(d3.axisLeft(y));
-
-// Gradient fill
-const defs = svg.append("defs");
-const gradient = defs.append("linearGradient")
-  .attr("id", "areaGradient")
-  .attr("x1", "0").attr("y1", "0")
-  .attr("x2", "0").attr("y2", "1");
-gradient.append("stop").attr("offset", "5%")
-  .attr("stop-color", "#3b82f6").attr("stop-opacity", 0.3);
-gradient.append("stop").attr("offset", "95%")
-  .attr("stop-color", "#3b82f6").attr("stop-opacity", 0);
-
-const area = d3.area()
-  .x(d => x(d["${xAxis}"]) + x.bandwidth() / 2)
-  .y0(innerH)
-  .y1(d => y(+d["${yAxis}"]))
-  .curve(d3.curveMonotoneX);
-
-g.append("path")
-  .datum(data)
-  .attr("fill", "url(#areaGradient)")
-  .attr("d", area);
-
-const line = d3.line()
-  .x(d => x(d["${xAxis}"]) + x.bandwidth() / 2)
-  .y(d => y(+d["${yAxis}"]))
-  .curve(d3.curveMonotoneX);
-
-g.append("path")
-  .datum(data)
-  .attr("fill", "none")
-  .attr("stroke", "#3b82f6")
-  .attr("stroke-width", 2)
-  .attr("d", line);`;
-
+      return `import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.plot(df["${xAxis}"], df["${yAxis}"])
+plt.xlabel("${xAxis}")
+plt.ylabel("${yAxis}")
+plt.title("${yAxis} by ${xAxis}")
+plt.tight_layout()
+plt.show()`;
     case 'scatter':
-      return `${header}
-const g = svg.append("g")
-  .attr("transform", \`translate(\${margin.left},\${margin.top})\`);
-
-const x = d3.scaleLinear()
-  .domain(d3.extent(data, d => +d["${xAxis}"]))
-  .nice()
-  .range([0, innerW]);
-
-const y = d3.scaleLinear()
-  .domain(d3.extent(data, d => +d["${yAxis}"]))
-  .nice()
-  .range([innerH, 0]);
-
-g.append("g")
-  .attr("transform", \`translate(0,\${innerH})\`)
-  .call(d3.axisBottom(x));
-
-g.append("g").call(d3.axisLeft(y));
-
-g.selectAll("circle")
-  .data(data)
-  .join("circle")
-  .attr("cx", d => x(+d["${xAxis}"]))
-  .attr("cy", d => y(+d["${yAxis}"]))
-  .attr("r", 4)
-  .attr("fill", "#3b82f6")
-  .attr("opacity", 0.7);`;
-
+      return `import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.scatter(df["${xAxis}"], df["${yAxis}"])
+plt.xlabel("${xAxis}")
+plt.ylabel("${yAxis}")
+plt.title("${yAxis} by ${xAxis}")
+plt.tight_layout()
+plt.show()`;
     case 'pie':
-      return `// Create a pie chart of "${yAxis}" by "${xAxis}" using D3.js
-const width = 500;
-const height = 500;
-const radius = Math.min(width, height) / 2 - 40;
-
-const svg = d3.select("#chart")
-  .append("svg")
-  .attr("width", width)
-  .attr("height", height)
-  .append("g")
-  .attr("transform", \`translate(\${width / 2},\${height / 2})\`);
-
-const color = d3.scaleOrdinal()
-  .domain(data.map(d => d["${xAxis}"]))
-  .range(d3.schemeTableau10);
-
-const pie = d3.pie()
-  .value(d => +d["${yAxis}"])
-  .sort(null);
-
-const arc = d3.arc()
-  .innerRadius(0)
-  .outerRadius(radius);
-
-const labelArc = d3.arc()
-  .innerRadius(radius * 0.65)
-  .outerRadius(radius * 0.65);
-
-svg.selectAll("path")
-  .data(pie(data))
-  .join("path")
-  .attr("d", arc)
-  .attr("fill", d => color(d.data["${xAxis}"]))
-  .attr("stroke", "#fff")
-  .attr("stroke-width", 2);
-
-svg.selectAll("text")
-  .data(pie(data))
-  .join("text")
-  .attr("transform", d => \`translate(\${labelArc.centroid(d)})\`)
-  .attr("text-anchor", "middle")
-  .attr("font-size", "11px")
-  .text(d => d.data["${xAxis}"]);`;
-
+      return `import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.pie(df["${yAxis}"], labels=df["${xAxis}"], autopct="%1.1f%%")
+plt.title("${yAxis} by ${xAxis}")
+plt.tight_layout()
+plt.show()`;
+    case 'area':
+      return `import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.fill_between(range(len(df)), df["${yAxis}"], alpha=0.3)
+plt.plot(range(len(df)), df["${yAxis}"])
+plt.xlabel("${xAxis}")
+plt.ylabel("${yAxis}")
+plt.title("${yAxis} by ${xAxis}")
+plt.tight_layout()
+plt.show()`;
     default:
-      return `${header}
-// Unsupported chart type: "${type}"
-// Configure a valid chart type (bar, line, area, scatter, pie)`;
+      return `import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.bar(df["${xAxis}"], df["${yAxis}"])
+plt.xlabel("${xAxis}")
+plt.ylabel("${yAxis}")
+plt.title("${yAxis} by ${xAxis}")
+plt.tight_layout()
+plt.show()`;
   }
 }
 
@@ -539,10 +243,11 @@ function generateDataSourceCode(config: Record<string, unknown>): string {
   const { fileName } = config;
 
   if (!fileName) {
-    return `// Data Source — upload a CSV file to generate code
-const data = await d3.csv("your-file.csv", d3.autoType);`;
+    return `# Data Source — set a file path or paste data
+# df = pd.read_csv("your-file.csv")
+df = pd.DataFrame()`;
   }
 
-  return `// Load data from "${fileName}"
-const data = await d3.csv(${JSON.stringify(fileName)}, d3.autoType);`;
+  return `df = pd.read_csv(${JSON.stringify(fileName)})
+print(f"Loaded {len(df)} rows, {len(df.columns)} columns")`;
 }

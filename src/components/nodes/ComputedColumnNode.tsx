@@ -12,7 +12,7 @@ type ComputedColumnNodeProps = NodeProps & {
   data: ComputedColumnNodeData;
 };
 
-export function ComputedColumnNode({ id, data }: ComputedColumnNodeProps) {
+export function ComputedColumnNode({ id, data, selected }: ComputedColumnNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -37,23 +37,13 @@ export function ComputedColumnNode({ id, data }: ComputedColumnNodeProps) {
   const columns = upstreamData?.columns ?? [];
   const nodeOutput = useDataStore((s) => s.nodeOutputs[id]);
 
-  // Code view handlers
-  const handleToggleCodeMode = useCallback(() => {
-    updateNode(id, { isCodeMode: !data.isCodeMode });
-  }, [id, data.isCodeMode, updateNode]);
-
-  const handleCodeChange = useCallback(
-    (code: string) => {
-      updateNode(id, { customCode: code, isCodeMode: true });
-    },
-    [id, updateNode]
-  );
-
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Computed Column"
       icon={<Calculator size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}
@@ -61,12 +51,8 @@ export function ComputedColumnNode({ id, data }: ComputedColumnNodeProps) {
       nodeConfig={config}
       inputRowCount={data.inputRowCount}
       outputRowCount={data.outputRowCount}
-      isCodeMode={data.isCodeMode}
       customCode={data.customCode}
-      onToggleCodeMode={handleToggleCodeMode}
-      onCodeChange={handleCodeChange}
-      executionError={data.error}
-      upstreamColumns={columns.map((c) => c.name)}
+      errorMessage={data.error}
     >
       <div className="space-y-2">
         {/* New column name */}

@@ -1,4 +1,4 @@
-import { type DragEvent, useState } from 'react';
+import { useState } from 'react';
 import {
   Table,
   Filter,
@@ -9,11 +9,14 @@ import {
   BarChart3,
   Calculator,
   FlipVertical2,
-  GripVertical,
-  Wand2,
+  FileCode,
+  Database,
+  Loader2,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
-import { PipelinePrompt } from './PipelinePrompt';
+import { useCanvasStore } from '@/stores/canvasStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
+import { SAMPLE_DATASETS, loadSampleIntoDataSource, type SampleDataset } from '@/lib/sampleData';
 
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
@@ -28,51 +31,102 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 export function NodePalette() {
-  const [showPrompt, setShowPrompt] = useState(false);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
+  const showCodeByDefault = usePreferencesStore((s) => s.showCodeByDefault);
 
-  const onDragStart = (
-    event: DragEvent<HTMLDivElement>,
-    nodeType: string
-  ) => {
-    event.dataTransfer.setData('application/reactflow', nodeType);
-    event.dataTransfer.effectAllowed = 'move';
+  const [loadingSampleId, setLoadingSampleId] = useState<string | null>(null);
+  const [sampleError, setSampleError] = useState<string | null>(null);
+
+  const handleAddNode = (type: string) => {
+    const info = nodeTypeInfos.find((n) => n.type === type);
+    if (!info) return;
+    const supportsCodeMode = type !== 'dataSource' && type !== 'transform';
+    const x = 120 + nodes.length * 320;
+    const y = 120;
+    addNode({
+      id: `node-${Date.now()}`,
+      type,
+      position: { x, y },
+      data: {
+        ...info.defaultData,
+        ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
+      },
+    });
+  };
+
+  const handleSampleClick = async (sample: SampleDataset) => {
+    setSampleError(null);
+    setLoadingSampleId(sample.id);
+    const nodeId = `node-${Date.now()}`;
+    try {
+      await loadSampleIntoDataSource(nodeId, sample);
+    } catch (err) {
+      setSampleError(err instanceof Error ? err.message : 'Failed to load sample');
+    } finally {
+      setLoadingSampleId(null);
+    }
   };
 
   return (
     <>
-      <div className="flex h-full w-60 flex-col border-r border-gray-200 bg-white">
-        {/* Header */}
-        <div className="border-b border-gray-100 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-800">Convoy</h2>
-          <p className="mt-0.5 text-[10px] text-gray-400">
-            Drag nodes onto the canvas
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* Data / get started */}
+        <div className="border-b border-gray-100 px-3 py-2">
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+            Data
           </p>
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:bg-emerald-50/50"
+            >
+              <FileCode size={14} className="text-emerald-600" />
+              Import Python
+            </button>
+            {SAMPLE_DATASETS.map((sample) => {
+              const isLoading = loadingSampleId === sample.id;
+              return (
+                <button
+                  key={sample.id}
+                  type="button"
+                  onClick={() => handleSampleClick(sample)}
+                  disabled={loadingSampleId != null}
+                  title={sample.description}
+                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:bg-blue-50/50 disabled:opacity-60"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-gray-100">
+                    {isLoading ? (
+                      <Loader2 size={14} className="animate-spin text-blue-600" />
+                    ) : (
+                      <Database size={14} className="text-gray-600" />
+                    )}
+                  </span>
+                  <span className="truncate">{sample.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {sampleError && (
+            <p className="mt-1.5 text-[10px] text-red-600">{sampleError}</p>
+          )}
         </div>
 
-        <div className="border-b border-gray-100 px-3 py-3">
-          <button
-            onClick={() => setShowPrompt(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-indigo-600 hover:shadow-md active:from-blue-700 active:to-indigo-700"
-          >
-            <Wand2 size={16} />
-            Build from description
-          </button>
-        </div>
-
-        {/* Node list */}
+        {/* Node types — click to add */}
         <div className="flex-1 overflow-y-auto p-3">
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+            Nodes
+          </p>
           <div className="space-y-1.5">
             {nodeTypeInfos.map((info) => (
-              <div
+              <button
                 key={info.type}
-                className="group flex cursor-grab items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2.5 transition-all hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm active:cursor-grabbing"
-                draggable
-                onDragStart={(e) => onDragStart(e, info.type)}
+                type="button"
+                onClick={() => handleAddNode(info.type)}
+                className="group flex w-full items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-left transition-all hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm"
               >
-                <GripVertical
-                  size={12}
-                  className="flex-shrink-0 text-gray-300 group-hover:text-gray-400"
-                />
                 <span className="flex-shrink-0 text-gray-400 group-hover:text-blue-500">
                   {iconMap[info.icon]}
                 </span>
@@ -84,7 +138,7 @@ export function NodePalette() {
                     {info.description}
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -96,13 +150,6 @@ export function NodePalette() {
           </p>
         </div>
       </div>
-
-      {/* Pipeline Prompt modal - rendered outside sidebar */}
-      {showPrompt && (
-        <div className="fixed inset-0 z-50">
-          <PipelinePrompt onClose={() => setShowPrompt(false)} />
-        </div>
-      )}
     </>
   );
 }

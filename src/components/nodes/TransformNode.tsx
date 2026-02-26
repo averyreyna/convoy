@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { Code2 } from 'lucide-react';
 import { BaseNode } from './BaseNode';
@@ -30,7 +30,7 @@ const DEFAULT_TRANSFORM_CODE = `// The input data is available as 'rows' (array 
 
 return { columns, rows };`;
 
-export function TransformNode({ id, data }: TransformNodeProps) {
+export function TransformNode({ id, data, selected }: TransformNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -54,23 +54,13 @@ export function TransformNode({ id, data }: TransformNodeProps) {
 
   const nodeOutput = useDataStore((s) => s.nodeOutputs[id]);
 
-  // Code view handlers
-  const handleToggleCodeMode = useCallback(() => {
-    // Transform is always in code mode — no-op
-  }, []);
-
-  const handleCodeChange = useCallback(
-    (code: string) => {
-      updateNode(id, { customCode: code, isCodeMode: true });
-    },
-    [id, updateNode]
-  );
-
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Transform"
       icon={<Code2 size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}
@@ -78,16 +68,13 @@ export function TransformNode({ id, data }: TransformNodeProps) {
       nodeConfig={config}
       inputRowCount={data.inputRowCount}
       outputRowCount={data.outputRowCount}
-      isCodeMode={true}
       customCode={code}
-      onToggleCodeMode={handleToggleCodeMode}
-      onCodeChange={handleCodeChange}
-      codeOnly
-      executionError={data.error}
-      upstreamColumns={(upstreamData?.columns ?? []).map((c) => c.name)}
+      errorMessage={data.error}
     >
-      {/* Children not shown for code-only nodes */}
-      <div className="space-y-1">
+      <div className="space-y-2">
+        <p className="text-[10px] text-gray-500">
+          Edit code in the pipeline view (right panel).
+        </p>
         {data.inputRowCount !== undefined && (
           <div className="flex items-center justify-between rounded-md bg-gray-50 px-2 py-1 text-[10px] text-gray-500">
             <span>{data.inputRowCount.toLocaleString()} rows in</span>
@@ -100,11 +87,6 @@ export function TransformNode({ id, data }: TransformNodeProps) {
         {!upstreamData && data.state === 'confirmed' && (
           <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
             Connect a data source to process data
-          </div>
-        )}
-        {data.error && (
-          <div className="rounded-md bg-red-50 px-2 py-1 text-[10px] text-red-600">
-            {data.error}
           </div>
         )}
 

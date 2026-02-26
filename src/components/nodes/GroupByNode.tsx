@@ -20,7 +20,7 @@ type GroupByNodeProps = NodeProps & {
   data: GroupByNodeData;
 };
 
-export function GroupByNode({ id, data }: GroupByNodeProps) {
+export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
   const confirmNode = useCanvasStore((s) => s.confirmNode);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
@@ -54,23 +54,13 @@ export function GroupByNode({ id, data }: GroupByNodeProps) {
     ? columns.filter((c) => c.type === 'number')
     : columns;
 
-  // Code view handlers
-  const handleToggleCodeMode = useCallback(() => {
-    updateNode(id, { isCodeMode: !data.isCodeMode });
-  }, [id, data.isCodeMode, updateNode]);
-
-  const handleCodeChange = useCallback(
-    (code: string) => {
-      updateNode(id, { customCode: code, isCodeMode: true });
-    },
-    [id, updateNode]
-  );
-
   return (
     <BaseNode
+      nodeId={id}
       state={data.state}
       title="Group By"
       icon={<Layers size={16} />}
+      selected={selected}
       inputs={1}
       outputs={1}
       onConfirm={() => confirmNode(id)}
@@ -78,12 +68,8 @@ export function GroupByNode({ id, data }: GroupByNodeProps) {
       nodeConfig={config}
       inputRowCount={data.inputRowCount}
       outputRowCount={data.outputRowCount}
-      isCodeMode={data.isCodeMode}
       customCode={data.customCode}
-      onToggleCodeMode={handleToggleCodeMode}
-      onCodeChange={handleCodeChange}
-      executionError={data.error}
-      upstreamColumns={columns.map((c) => c.name)}
+      errorMessage={data.error}
     >
       <div className="space-y-2">
         {/* Group by column */}

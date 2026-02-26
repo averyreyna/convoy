@@ -47,10 +47,14 @@ export interface GroupByNodeData extends BaseNodeData {
 export interface SortNodeData extends BaseNodeData {
   column?: string;
   direction?: 'asc' | 'desc';
+  inputRowCount?: number;
+  outputRowCount?: number;
 }
 
 export interface SelectNodeData extends BaseNodeData {
   columns?: string[];
+  inputRowCount?: number;
+  outputRowCount?: number;
 }
 
 export interface ChartNodeData extends BaseNodeData {
@@ -93,6 +97,12 @@ export interface ProposedPipeline {
     config: Record<string, unknown>;
   }>;
   explanation: string;
+}
+
+// Response from import-from-python API
+export interface ImportFromPythonResponse {
+  pipeline: ProposedPipeline;
+  method?: 'ast' | 'llm';
 }
 
 // Node type metadata for the palette
