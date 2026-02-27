@@ -1,7 +1,16 @@
 import { useCallback, useRef } from 'react';
 import { X, Download, Image } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { D3Chart } from '@/components/charts/D3Chart';
 import type { Column } from '@/types';
+import {
+  modalOverlay,
+  modalPanel,
+  modalHeader,
+  headingLg,
+  caption,
+  button,
+} from '@/design-system';
 
 interface ChartPreviewModalProps {
   isOpen: boolean;
@@ -78,22 +87,22 @@ export function ChartPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className={cn(modalOverlay, 'fixed z-[9999]')}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();
       }}
+      role="dialog"
+      aria-modal
+      tabIndex={-1}
     >
-      <div className="relative h-[80vh] w-[85vw] max-w-5xl rounded-xl bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+      <div className={cn(modalPanel, 'h-[80vh] w-[85vw]')}>
+        <div className={cn(modalHeader, 'px-6')}>
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">
-              Chart Preview
-            </h2>
-            <p className="text-sm text-gray-500">
+            <h2 className={headingLg}>Chart Preview</h2>
+            <p className={caption}>
               {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart
               &mdash; {yAxis} by {xAxis}
               {data.length > 0 && ` (${data.length} data points)`}
@@ -101,24 +110,28 @@ export function ChartPreviewModal({
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handleExportPNG}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+              className={cn(button.base, button.variants.secondary, button.sizes.md)}
               title="Export as PNG"
             >
               <Image size={14} />
               PNG
             </button>
             <button
+              type="button"
               onClick={handleExportSVG}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+              className={cn(button.base, button.variants.secondary, button.sizes.md)}
               title="Export as SVG"
             >
               <Download size={14} />
               SVG
             </button>
             <button
+              type="button"
               onClick={onClose}
-              className="ml-2 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className={cn(button.base, button.variants.ghost, button.sizes.md)}
+              aria-label="Close"
             >
               <X size={20} />
             </button>

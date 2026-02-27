@@ -1,11 +1,13 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { Calculator } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useNodeExecution } from '@/hooks/useNodeExecution';
 import { DataPreview } from './DataPreview';
+import { label, input, alertWarning, captionMuted } from '@/design-system';
 import type { ComputedColumnNodeData } from '@/types';
 
 type ComputedColumnNodeProps = NodeProps & {
@@ -57,33 +59,29 @@ export function ComputedColumnNode({ id, data, selected }: ComputedColumnNodePro
       <div className="space-y-2">
         {/* New column name */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Column name
-          </label>
+          <label className={label}>Column name</label>
           <input
             type="text"
             value={data.newColumnName || ''}
             onChange={(e) => updateNode(id, { newColumnName: e.target.value })}
             placeholder="e.g. density"
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
             onClick={(e) => e.stopPropagation()}
           />
         </div>
 
         {/* Expression */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Expression
-          </label>
+          <label className={label}>Expression</label>
           <input
             type="text"
             value={data.expression || ''}
             onChange={(e) => updateNode(id, { expression: e.target.value })}
             placeholder="e.g. d.population / d.area"
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs font-mono text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={cn(input.default, 'font-mono')}
             onClick={(e) => e.stopPropagation()}
           />
-          <div className="mt-1 text-[9px] text-gray-400">
+          <div className={cn('mt-1', captionMuted)}>
             Use <code className="rounded bg-gray-100 px-0.5">d.column_name</code> to reference columns
           </div>
         </div>
@@ -94,13 +92,13 @@ export function ComputedColumnNode({ id, data, selected }: ComputedColumnNodePro
             {columns.slice(0, 6).map((col) => (
               <span
                 key={col.name}
-                className="rounded bg-gray-100 px-1 py-0.5 text-[9px] font-mono text-gray-500"
+                className={cn('rounded bg-gray-100 px-1 py-0.5 font-mono', captionMuted)}
               >
                 d.{col.name}
               </span>
             ))}
             {columns.length > 6 && (
-              <span className="rounded bg-gray-100 px-1 py-0.5 text-[9px] text-gray-400">
+              <span className={cn('rounded bg-gray-100 px-1 py-0.5', captionMuted)}>
                 +{columns.length - 6} more
               </span>
             )}
@@ -112,7 +110,7 @@ export function ComputedColumnNode({ id, data, selected }: ComputedColumnNodePro
 
         {/* No upstream data warning */}
         {!upstreamData && data.state === 'confirmed' && (
-          <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+          <div className={cn(alertWarning, '!mb-0')}>
             Connect a data source to populate columns
           </div>
         )}

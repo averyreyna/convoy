@@ -1,8 +1,19 @@
 import { useMemo, useEffect, useCallback } from 'react';
 import { diffLines, type Change } from 'diff';
 import { X, Pin, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { exportAsPython } from '@/lib/exportPipeline';
+import {
+  modalOverlay,
+  modalPanel,
+  modalHeader,
+  headingBase,
+  badge,
+  button,
+  label,
+  panelSectionHeader,
+} from '@/design-system';
 
 const PLACEHOLDER = 'No baseline—import code or pin current';
 
@@ -84,22 +95,26 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
 
   return (
     <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/30 backdrop-blur-sm"
+      className={modalOverlay}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="flex h-[85vh] w-full max-w-5xl flex-col rounded-xl border border-gray-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+      <div className={cn(modalPanel, 'h-[85vh]')}>
+        <div className={modalHeader}>
           <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold text-gray-900">Code changes</h2>
-            <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-              Python
-            </span>
+            <h2 className={headingBase}>Code changes</h2>
+            <span className={cn(badge.base, badge.variants.neutral)}>Python</span>
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handlePinCurrent}
               disabled={!currentExport}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              className={cn(
+                button.base,
+                button.variants.secondary,
+                button.sizes.sm,
+                'disabled:opacity-50'
+              )}
               title="Set baseline to current export"
             >
               <Pin size={14} />
@@ -107,8 +122,9 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
             </button>
             {hasBaseline && (
               <button
+                type="button"
                 onClick={() => clearBaseline()}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                className={cn(button.base, button.variants.danger, button.sizes.sm)}
                 title="Clear baseline"
               >
                 <Trash2 size={14} />
@@ -116,8 +132,9 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
               </button>
             )}
             <button
+              type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className={cn(button.base, button.variants.ghost, button.sizes.sm)}
               aria-label="Close"
             >
               <X size={18} />
@@ -125,10 +142,10 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
           </div>
         </div>
 
-        <div className="grid flex-1 grid-cols-2 gap-px overflow-hidden border-t border-gray-200 bg-gray-200">
+        <div className="grid flex-1 grid-cols-2 gap-px overflow-hidden border-t border-gray-200 bg-gray-200 min-h-0">
           {/* Before (baseline) */}
-          <div className="flex flex-col bg-gray-50">
-            <div className="border-b border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-500">
+          <div className="flex flex-col bg-gray-50 min-h-0">
+            <div className={cn(panelSectionHeader, label, 'border-b border-gray-200 bg-white')}>
               Before (baseline)
             </div>
             <div className="flex-1 overflow-auto p-2 font-mono text-xs">
@@ -171,8 +188,8 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
           </div>
 
           {/* After (current export) */}
-          <div className="flex flex-col bg-gray-50">
-            <div className="border-b border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-500">
+          <div className="flex flex-col bg-gray-50 min-h-0">
+            <div className={cn(panelSectionHeader, label, 'border-b border-gray-200 bg-white')}>
               After (current)
             </div>
             <div className="flex-1 overflow-auto p-2 font-mono text-xs">

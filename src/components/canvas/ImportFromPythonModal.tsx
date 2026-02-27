@@ -1,7 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { FileCode, ArrowRight, X, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { importPipelineFromPython } from '@/lib/api';
+import {
+  modalOverlay,
+  modalPanel,
+  modalHeader,
+  headingBase,
+  caption,
+  button,
+  input,
+  alert,
+  spinner,
+} from '@/design-system';
 
 // Matches sample dataset: public/data/gapminder.csv (country, continent, year, population, gdpPerCapita, lifeExpectancy)
 const EXAMPLE_SNIPPET = `import pandas as pd
@@ -68,29 +80,28 @@ export function ImportFromPythonModal({ onClose }: ImportFromPythonModalProps) {
 
   return (
     <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/20 backdrop-blur-sm"
+      className={modalOverlay}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl">
+      <div className={cn(modalPanel, 'w-full max-w-lg p-6')}>
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
               <FileCode className="text-emerald-600" size={18} />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900">
-                Import from Python
-              </h2>
-              <p className="text-xs text-gray-500">
+              <h2 className={headingBase}>Import from Python</h2>
+              <p className={caption}>
                 Paste a pandas script to generate pipeline nodes
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className={cn(button.base, button.variants.ghost, button.sizes.md)}
             aria-label="Close"
           >
             <X size={18} />
@@ -106,7 +117,7 @@ export function ImportFromPythonModal({ onClose }: ImportFromPythonModalProps) {
           }}
           onKeyDown={handleKeyDown}
           placeholder="Paste your Python/pandas script here..."
-          className="mb-3 h-40 w-full resize-y rounded-lg border border-gray-200 p-3 font-mono text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+          className={cn(input.default, 'mb-3 h-40 resize-y font-mono text-sm')}
           disabled={isLoading}
         />
 
@@ -125,9 +136,9 @@ export function ImportFromPythonModal({ onClose }: ImportFromPythonModalProps) {
         </div>
 
         {error && (
-          <div className="mb-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2">
+          <div className={cn(alert, 'mb-3 flex items-start gap-2')}>
             <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-500" />
-            <p className="text-xs text-red-700">{error}</p>
+            <p className="text-xs">{error}</p>
           </div>
         )}
 
@@ -137,20 +148,22 @@ export function ImportFromPythonModal({ onClose }: ImportFromPythonModalProps) {
           </p>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="rounded-lg px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
+              className={cn(button.base, button.variants.secondary, button.sizes.md, 'disabled:opacity-50')}
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleImport}
               disabled={!source.trim() || isLoading}
               className="flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 active:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? (
                 <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <div className={cn(spinner, 'border-white/30 border-t-white')} />
                   Importing...
                 </>
               ) : (

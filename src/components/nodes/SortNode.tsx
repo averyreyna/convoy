@@ -1,11 +1,13 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { ArrowUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useNodeExecution } from '@/hooks/useNodeExecution';
 import { DataPreview } from './DataPreview';
+import { label, input, button, alertWarning, segmentControl, segmentControlItem, segmentControlItemSelected } from '@/design-system';
 import type { SortNodeData } from '@/types';
 
 type SortNodeProps = NodeProps & {
@@ -57,13 +59,11 @@ export function SortNode({ id, data, selected }: SortNodeProps) {
       <div className="space-y-2">
         {/* Column selector */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Sort by
-          </label>
+          <label className={label}>Sort by</label>
           <select
             value={data.column || ''}
             onChange={(e) => updateNode(id, { column: e.target.value })}
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
           >
             <option value="">Select column...</option>
             {columns.map((col) => (
@@ -76,33 +76,25 @@ export function SortNode({ id, data, selected }: SortNodeProps) {
 
         {/* Direction toggle */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Direction
-          </label>
-          <div className="flex rounded-md border border-gray-200 p-0.5">
+          <label className={label}>Direction</label>
+          <div className={segmentControl}>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 updateNode(id, { direction: 'asc' });
               }}
-              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                data.direction !== 'desc'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={cn(segmentControlItem, 'flex-1', data.direction !== 'desc' && segmentControlItemSelected)}
             >
               Ascending
             </button>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 updateNode(id, { direction: 'desc' });
               }}
-              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                data.direction === 'desc'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={cn(segmentControlItem, 'flex-1', data.direction === 'desc' && segmentControlItemSelected)}
             >
               Descending
             </button>
@@ -114,7 +106,7 @@ export function SortNode({ id, data, selected }: SortNodeProps) {
 
         {/* No upstream data warning */}
         {!upstreamData && data.state === 'confirmed' && (
-          <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+          <div className={cn(alertWarning, '!mb-0')}>
             Connect a data source to populate columns
           </div>
         )}

@@ -6,6 +6,8 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useNodeExecution } from '@/hooks/useNodeExecution';
 import { DataPreview } from './DataPreview';
+import { cn } from '@/lib/utils';
+import { label, input, alertWarning, caption, mutedBox, dropZoneDefault } from '@/design-system';
 import type { ReshapeNodeData } from '@/types';
 
 type ReshapeNodeProps = NodeProps & {
@@ -71,39 +73,33 @@ export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
       <div className="space-y-2">
         {/* Key column name (the new column that holds the original column names) */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Key column name
-          </label>
+          <label className={label}>Key column name</label>
           <input
             type="text"
             value={data.keyColumn || ''}
             onChange={(e) => updateNode(id, { keyColumn: e.target.value })}
             placeholder='e.g. "year"'
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
             onClick={(e) => e.stopPropagation()}
           />
         </div>
 
         {/* Value column name */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Value column name
-          </label>
+          <label className={label}>Value column name</label>
           <input
             type="text"
             value={data.valueColumn || ''}
             onChange={(e) => updateNode(id, { valueColumn: e.target.value })}
             placeholder='e.g. "value"'
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
             onClick={(e) => e.stopPropagation()}
           />
         </div>
 
         {/* Pivot columns selector */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Columns to unpivot
-          </label>
+          <label className={label}>Columns to unpivot</label>
           {columns.length > 0 ? (
             <div className="max-h-32 space-y-0.5 overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-1.5">
               {columns.map((col) => {
@@ -141,7 +137,7 @@ export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
               })}
             </div>
           ) : (
-            <div className="rounded-md border-2 border-dashed border-gray-200 p-3 text-center text-xs text-gray-400">
+            <div className={cn(dropZoneDefault, 'text-center text-xs text-gray-400')}>
               No columns available
             </div>
           )}
@@ -149,7 +145,7 @@ export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
 
         {/* Summary */}
         {selectedPivotColumns.length > 0 && (
-          <div className="rounded-md bg-gray-50 px-2 py-1 text-[10px] text-gray-500">
+          <div className={cn(mutedBox, caption)}>
             Unpivoting {selectedPivotColumns.length} columns into{' '}
             <span className="font-medium">{data.keyColumn || '?'}</span> /{' '}
             <span className="font-medium">{data.valueColumn || '?'}</span>
@@ -161,7 +157,7 @@ export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
 
         {/* No upstream data warning */}
         {!upstreamData && data.state === 'confirmed' && (
-          <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+          <div className={cn(alertWarning, '!mb-0')}>
             Connect a data source to populate columns
           </div>
         )}

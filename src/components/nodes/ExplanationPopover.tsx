@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react';
 import { HelpCircle, X, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAIExplanation } from '@/hooks/useAIExplanation';
+import { button, card, label, alert, caption, spinner, mutedBox, mutedBoxRow } from '@/design-system';
 
 interface ExplanationPopoverProps {
   nodeType: string;
@@ -73,6 +75,7 @@ export function ExplanationPopover({
       {/* "?" button — visible on hover via group-hover */}
       <button
         ref={buttonRef}
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           if (isOpen) {
@@ -81,7 +84,7 @@ export function ExplanationPopover({
             show();
           }
         }}
-        className="rounded-full p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-blue-500 group-hover:opacity-100"
+        className={cn(button.base, button.variants.ghost, 'rounded-full p-0.5 opacity-0 transition-opacity hover:text-blue-500 group-hover:opacity-100')}
         aria-label="Explain this step"
         title="Explain this step"
       >
@@ -92,19 +95,20 @@ export function ExplanationPopover({
       {isOpen && (
         <div
           ref={popoverRef}
-          className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+          className={cn(card.base, 'absolute right-0 top-full z-50 mt-2 w-64 p-3')}
         >
           {/* Header */}
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500">
+            <span className={label}>
               What this does
             </span>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 hide();
               }}
-              className="rounded p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className={cn(button.base, button.variants.ghost, 'rounded p-0.5')}
               aria-label="Close explanation"
             >
               <X size={12} />
@@ -113,15 +117,15 @@ export function ExplanationPopover({
 
           {/* Loading state */}
           {isLoading && (
-            <div className="flex items-center gap-2 py-1 text-sm text-gray-400">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
+            <div className={cn('flex items-center gap-2 py-1 text-sm', caption)}>
+              <div className={spinner} />
               Thinking...
             </div>
           )}
 
           {/* Error state */}
           {error && !isLoading && (
-            <div className="flex items-start gap-2 text-sm text-red-500">
+            <div className={cn(alert, 'flex items-start gap-2 !mb-0')}>
               <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -134,7 +138,7 @@ export function ExplanationPopover({
 
           {/* Row count transformation */}
           {inputRowCount !== undefined && outputRowCount !== undefined && (
-            <div className="mt-2 flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1.5 text-xs text-gray-500">
+            <div className={cn(mutedBox, mutedBoxRow, caption, 'mt-2')}>
               <span>{inputRowCount.toLocaleString()} rows</span>
               <span className="text-gray-300">→</span>
               <span className="font-medium text-gray-700">

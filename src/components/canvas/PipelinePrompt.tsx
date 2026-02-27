@@ -1,8 +1,22 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Wand2, ArrowRight, X, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { generatePipeline } from '@/lib/api';
+import {
+  modalOverlay,
+  modalPanel,
+  headingBase,
+  caption,
+  button,
+  input,
+  alert,
+  alertWarning,
+  spinner,
+  iconWell,
+  mutedBox,
+} from '@/design-system';
 
 const EXAMPLE_PROMPTS = [
   'Show me a bar chart of values by category',
@@ -93,30 +107,31 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
 
   return (
     <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/20 backdrop-blur-sm"
+      className={modalOverlay}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl">
+      <div className={cn(modalPanel, 'w-full max-w-lg p-6')}>
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+            <div className={cn(iconWell, 'h-8 w-8')}>
               <Wand2 className="text-blue-500" size={18} />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className={headingBase}>
                 What do you want to visualize?
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className={caption}>
                 Describe in plain English and we'll build the pipeline
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className={cn(button.base, button.variants.ghost, button.sizes.md)}
             aria-label="Close"
           >
             <X size={18} />
@@ -125,8 +140,8 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
 
         {/* Data schema indicator */}
         {dataSchema ? (
-          <div className="mb-3 rounded-lg bg-gray-50 px-3 py-2">
-            <p className="text-xs text-gray-500">
+          <div className={cn(mutedBox, 'mb-3')}>
+            <p className={caption}>
               <span className="font-medium text-gray-700">
                 Available columns:
               </span>{' '}
@@ -134,9 +149,9 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
             </p>
           </div>
         ) : (
-          <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2">
+          <div className={cn(alertWarning, 'mb-3 flex items-start gap-2')}>
             <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-amber-500" />
-            <p className="text-xs text-amber-700">
+            <p className="text-xs">
               Add a Data Source node and upload a CSV file first to get
               pipeline suggestions.
             </p>
@@ -153,23 +168,24 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
           }}
           onKeyDown={handleKeyDown}
           placeholder="e.g., Show me a bar chart of sales by region, sorted by total revenue..."
-          className="mb-3 h-24 w-full resize-none rounded-lg border border-gray-200 p-3 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          className={cn(input.default, 'mb-3 h-24 resize-none text-sm')}
           disabled={isLoading}
         />
 
         {/* Example prompts */}
         <div className="mb-4">
-          <p className="mb-2 text-xs font-medium text-gray-500">Try an example:</p>
+          <p className={cn('mb-2', caption)}>Try an example:</p>
           <div className="flex flex-wrap gap-1.5">
             {EXAMPLE_PROMPTS.map((example) => (
               <button
                 key={example}
+                type="button"
                 onClick={() => {
                   setPrompt(example);
                   setError(null);
                 }}
                 disabled={isLoading}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                className={cn(button.base, button.variants.secondary, button.sizes.sm, 'rounded-full disabled:opacity-50')}
               >
                 {example}
               </button>
@@ -179,9 +195,9 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
 
         {/* Error message */}
         {error && (
-          <div className="mb-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2">
+          <div className={cn(alert, 'mb-3 flex items-start gap-2')}>
             <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-500" />
-            <p className="text-xs text-red-700">{error}</p>
+            <p className="text-xs">{error}</p>
           </div>
         )}
 
@@ -193,20 +209,22 @@ export function PipelinePrompt({ onClose }: PipelinePromptProps) {
           </p>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="rounded-lg px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
+              className={cn(button.base, button.variants.secondary, button.sizes.md, 'disabled:opacity-50')}
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={!prompt.trim() || isLoading || !dataSchema}
-              className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-600 active:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className={cn(button.base, button.variants.primary, button.sizes.md, 'disabled:cursor-not-allowed disabled:opacity-50')}
             >
               {isLoading ? (
                 <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <div className={cn(spinner, 'border-white/30 border-t-white')} />
                   Building...
                 </>
               ) : (

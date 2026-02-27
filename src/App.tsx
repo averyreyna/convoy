@@ -1,11 +1,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { ChevronLeft, ChevronRight, Code2, Globe, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { ConvoyCanvas } from '@/components/canvas/ConvoyCanvas';
 import { NodePalette } from '@/components/canvas/NodePalette';
 import { SidebarHeader } from '@/components/canvas/SidebarHeader';
 import { PipelineCodePanel } from '@/components/canvas/PipelineCodePanel';
+import { pageBackground } from '@/design-system';
 
 const MIN_CODE_PCT = 25;
 const MAX_CODE_PCT = 50;
@@ -59,7 +61,7 @@ export default function App() {
   const canvasPct = 100 - codePanelPct;
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-gray-50">
+    <div className={cn('relative flex h-screen w-screen overflow-hidden', pageBackground)}>
       <ReactFlowProvider>
         <div className="absolute left-0 top-0 z-10">
           <SidebarHeader />

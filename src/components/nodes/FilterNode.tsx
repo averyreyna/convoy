@@ -1,11 +1,13 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { Filter } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useNodeExecution } from '@/hooks/useNodeExecution';
 import { DataPreview } from './DataPreview';
+import { label, input, mutedBox, mutedBoxRow, caption } from '@/design-system';
 import type { FilterNodeData } from '@/types';
 
 const OPERATORS = [
@@ -67,13 +69,11 @@ export function FilterNode({ id, data, selected }: FilterNodeProps) {
       <div className="space-y-2">
         {/* Column selector */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Column
-          </label>
+          <label className={label}>Column</label>
           <select
             value={data.column || ''}
             onChange={(e) => updateNode(id, { column: e.target.value })}
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
           >
             <option value="">Select column...</option>
             {columns.map((col) => (
@@ -86,13 +86,11 @@ export function FilterNode({ id, data, selected }: FilterNodeProps) {
 
         {/* Operator selector */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Condition
-          </label>
+          <label className={label}>Condition</label>
           <select
             value={data.operator || ''}
             onChange={(e) => updateNode(id, { operator: e.target.value })}
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
           >
             <option value="">Select condition...</option>
             {OPERATORS.map((op) => (
@@ -105,21 +103,19 @@ export function FilterNode({ id, data, selected }: FilterNodeProps) {
 
         {/* Value input */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Value
-          </label>
+          <label className={label}>Value</label>
           <input
             type="text"
             value={data.value || ''}
             onChange={(e) => updateNode(id, { value: e.target.value })}
             placeholder="Enter value..."
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
           />
         </div>
 
         {/* Row count indicator */}
         {data.inputRowCount !== undefined && (
-          <div className="flex items-center justify-between rounded-md bg-gray-50 px-2 py-1 text-[10px] text-gray-500">
+          <div className={cn(mutedBox, mutedBoxRow, caption)}>
             <span>{data.inputRowCount.toLocaleString()} rows in</span>
             <span className="text-gray-300">→</span>
             <span className="font-medium text-gray-700">

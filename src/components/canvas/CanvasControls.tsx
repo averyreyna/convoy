@@ -1,10 +1,26 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Panel, useReactFlow } from '@xyflow/react';
 import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Download, GitCompare, Wand2, X, AlertCircle, Pin, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { downloadPipelineScript } from '@/lib/exportPipeline';
 import { editNodes } from '@/lib/api';
+import {
+  button,
+  modalOverlay,
+  modalPanel,
+  headingSm,
+  caption,
+  input,
+  alert,
+  dividerVertical,
+  spinner,
+  iconWell,
+  menuPanel,
+  menuItem,
+  menuItemIcon,
+} from '@/design-system';
 import { ScriptDiffModal } from './ScriptDiffModal';
 
 export function CanvasControls() {
@@ -131,7 +147,7 @@ export function CanvasControls() {
                 setEditError(null);
                 setShowEditWithAIModal(true);
               }}
-              className="flex items-center gap-1.5 rounded-md bg-blue-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-600"
+              className={cn(button.base, button.variants.primary, button.sizes.md)}
               title="Edit selected nodes with AI"
             >
               <Wand2 size={14} />
@@ -139,7 +155,7 @@ export function CanvasControls() {
             </button>
             <button
               onClick={() => setBaselineForSelection()}
-              className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className={cn(button.base, button.variants.secondary, button.sizes.md)}
               title="Pin selection as baseline for inline diff"
             >
               <Pin size={14} />
@@ -153,8 +169,9 @@ export function CanvasControls() {
         <div ref={menuRef} className="relative">
           <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
             <button
+              type="button"
               onClick={() => setShowExportMenu((v) => !v)}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              className={cn(button.base, button.variants.ghost, button.sizes.sm)}
               aria-label="Export and code changes"
               title="Export, import, and view code diff"
             >
@@ -164,15 +181,15 @@ export function CanvasControls() {
           </div>
 
           {showExportMenu && (
-            <div className="absolute bottom-full right-0 mb-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            <div className={cn(menuPanel, 'absolute bottom-full right-0 mb-1 w-52')}>
               <button
                 onClick={() => {
                   setShowExportMenu(false);
                   setShowImportModal(true);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                className={menuItem}
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700">
+                <span className={cn(menuItemIcon, 'flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700')}>
                   PY
                 </span>
                 Import from Python
@@ -182,10 +199,10 @@ export function CanvasControls() {
                   setShowExportMenu(false);
                   setShowDiffModal(true);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                className={menuItem}
                 title="View diff between baseline and current export"
               >
-                <GitCompare size={14} className="text-gray-500" />
+                <GitCompare size={14} className={menuItemIcon} />
                 Code changes
               </button>
               {hasNodeBaselines && (
@@ -194,10 +211,10 @@ export function CanvasControls() {
                     clearAllNodeBaselines();
                     setShowExportMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                  className={menuItem}
                   title="Clear per-node diff baselines"
                 >
-                  <Trash2 size={14} className="text-gray-500" />
+                  <Trash2 size={14} className={menuItemIcon} />
                   Clear node baselines
                 </button>
               )}
@@ -207,11 +224,9 @@ export function CanvasControls() {
                   setShowExportMenu(false);
                 }}
                 disabled={!hasNodes}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
-                  hasNodes ? 'text-gray-700 hover:bg-gray-50' : 'cursor-not-allowed text-gray-400'
-                }`}
+                className={cn(menuItem, !hasNodes && 'cursor-not-allowed text-gray-400')}
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-100 text-[9px] font-bold text-blue-700">
+                <span className={cn(menuItemIcon, 'flex h-5 w-5 items-center justify-center rounded bg-blue-100 text-[9px] font-bold text-blue-700')}>
                   PY
                 </span>
                 Export as Python
@@ -222,33 +237,37 @@ export function CanvasControls() {
 
         <div className="flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
           <button
+            type="button"
             onClick={() => zoomIn({ duration: 200 })}
-            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm)}
             aria-label="Zoom in"
             title="Zoom in"
           >
             <ZoomIn size={16} />
           </button>
           <button
+            type="button"
             onClick={() => zoomOut({ duration: 200 })}
-            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm)}
             aria-label="Zoom out"
             title="Zoom out"
           >
             <ZoomOut size={16} />
           </button>
-          <div className="mx-0.5 h-4 w-px bg-gray-200" />
+          <div className={cn(dividerVertical, 'mx-0.5 shrink-0')} />
           <button
+            type="button"
             onClick={() => fitView({ duration: 300, padding: 0.2 })}
-            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm)}
             aria-label="Fit view"
             title="Fit to view"
           >
             <Maximize2 size={16} />
           </button>
           <button
+            type="button"
             onClick={handleReset}
-            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm)}
             aria-label="Reset view"
             title="Reset view"
           >
@@ -264,30 +283,31 @@ export function CanvasControls() {
 
       {showEditWithAIModal && (
         <div
-          className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/20 backdrop-blur-sm"
+          className={modalOverlay}
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowEditWithAIModal(false);
           }}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-2xl"
+            className={cn(modalPanel, 'w-full max-w-md p-4')}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                <div className={cn(iconWell, 'h-8 w-8')}>
                   <Wand2 className="text-blue-500" size={18} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900">Edit with AI</h2>
-                  <p className="text-xs text-gray-500">
+                  <h2 className={headingSm}>Edit with AI</h2>
+                  <p className={caption}>
                     Describe how to change the {selectedCount} selected node{selectedCount !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowEditWithAIModal(false)}
-                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                className={cn(button.base, button.variants.ghost, button.sizes.sm)}
                 aria-label="Close"
               >
                 <X size={18} />
@@ -307,32 +327,34 @@ export function CanvasControls() {
                 }
               }}
               placeholder="e.g., Change the filter to use column X and value Y..."
-              className="mb-3 h-20 w-full resize-none rounded-lg border border-gray-200 p-3 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className={cn(input.default, 'mb-3 h-20 resize-none text-sm')}
               disabled={editLoading}
               autoFocus
             />
             {editError && (
-              <div className="mb-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2">
+              <div className={cn(alert, 'mb-3 flex items-start gap-2')}>
                 <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-red-500" />
-                <p className="text-xs text-red-700">{editError}</p>
+                <p className="text-xs">{editError}</p>
               </div>
             )}
             <div className="flex justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setShowEditWithAIModal(false)}
                 disabled={editLoading}
-                className="rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
+                className={cn(button.base, button.variants.secondary, button.sizes.md, 'disabled:opacity-50')}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleEditWithAISubmit}
                 disabled={!editPrompt.trim() || editLoading}
-                className="flex items-center gap-2 rounded-lg bg-blue-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className={cn(button.base, button.variants.primary, button.sizes.md, 'disabled:cursor-not-allowed disabled:opacity-50')}
               >
                 {editLoading ? (
                   <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <div className={cn(spinner, 'border-white/30 border-t-white')} />
                     Applying...
                   </>
                 ) : (

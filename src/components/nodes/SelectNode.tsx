@@ -1,11 +1,13 @@
 import { useMemo, useCallback } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { Columns3, X, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useNodeExecution } from '@/hooks/useNodeExecution';
 import { DataPreview } from './DataPreview';
+import { label, alertWarning, dropZoneDefault } from '@/design-system';
 import type { SelectNodeData } from '@/types';
 
 type SelectNodeProps = NodeProps & {
@@ -79,7 +81,7 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
       <div className="space-y-2">
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+            <label className={label}>
               Columns to keep
             </label>
             {availableColumns.length > 0 && (
@@ -144,7 +146,7 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
               })}
             </div>
           ) : (
-            <div className="rounded-md border-2 border-dashed border-gray-200 p-3 text-center text-xs text-gray-400">
+            <div className={cn(dropZoneDefault, 'text-center text-xs text-gray-400')}>
               No columns available
             </div>
           )}
@@ -186,7 +188,7 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
 
         {/* No upstream data warning */}
         {!upstreamData && data.state === 'confirmed' && (
-          <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+          <div className={cn(alertWarning, '!mb-0')}>
             Connect a data source to populate columns
           </div>
         )}

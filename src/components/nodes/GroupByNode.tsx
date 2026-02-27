@@ -1,11 +1,13 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { Layers } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useNodeExecution } from '@/hooks/useNodeExecution';
 import { DataPreview } from './DataPreview';
+import { label, input, alertWarning, caption, mutedBox, mutedBoxRow } from '@/design-system';
 import type { GroupByNodeData } from '@/types';
 
 const AGGREGATIONS = [
@@ -74,15 +76,13 @@ export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
       <div className="space-y-2">
         {/* Group by column */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Group by
-          </label>
+          <label className={label}>Group by</label>
           <select
             value={data.groupByColumn || ''}
             onChange={(e) =>
               updateNode(id, { groupByColumn: e.target.value })
             }
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
           >
             <option value="">Select column...</option>
             {columns.map((col) => (
@@ -95,15 +95,13 @@ export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
 
         {/* Aggregation function */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Aggregation
-          </label>
+          <label className={label}>Aggregation</label>
           <select
             value={data.aggregation || ''}
             onChange={(e) =>
               updateNode(id, { aggregation: e.target.value })
             }
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+            className={input.default}
           >
             <option value="">Select function...</option>
             {AGGREGATIONS.map((agg) => (
@@ -117,15 +115,13 @@ export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
         {/* Aggregate column (hidden for 'count') */}
         {data.aggregation && data.aggregation !== 'count' && (
           <div>
-            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-              Aggregate column
-            </label>
+            <label className={label}>Aggregate column</label>
             <select
               value={data.aggregateColumn || ''}
               onChange={(e) =>
                 updateNode(id, { aggregateColumn: e.target.value })
               }
-              className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+              className={input.default}
             >
               <option value="">Select column...</option>
               {aggregateColumns.map((col) => (
@@ -139,7 +135,7 @@ export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
 
         {/* Row count indicator */}
         {data.inputRowCount !== undefined && (
-          <div className="flex items-center justify-between rounded-md bg-gray-50 px-2 py-1 text-[10px] text-gray-500">
+          <div className={cn(mutedBox, mutedBoxRow, caption)}>
             <span>{data.inputRowCount.toLocaleString()} rows in</span>
             <span className="text-gray-300">→</span>
             <span className="font-medium text-gray-700">
@@ -153,7 +149,7 @@ export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
 
         {/* No upstream data warning */}
         {!upstreamData && data.state === 'confirmed' && (
-          <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+          <div className={cn(alertWarning, '!mb-0')}>
             Connect a data source to populate columns
           </div>
         )}

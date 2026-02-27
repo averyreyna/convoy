@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Table2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { label, tableContainer, tableHeader } from '@/design-system';
 import type { DataFrame } from '@/types';
 
 /** Maximum rows to render in the preview table for large datasets (keeps UI fast). */
@@ -43,11 +45,12 @@ export function DataPreview({
     <div className="space-y-1">
       {/* Toggle header */}
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex w-full items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-gray-400 transition-colors hover:text-gray-600"
+        className={cn(label, 'flex w-full items-center gap-1 transition-colors hover:text-gray-600')}
       >
         {isOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
         <Table2 size={10} />
@@ -59,14 +62,14 @@ export function DataPreview({
 
       {/* Table */}
       {isOpen && (
-        <div className="max-h-36 overflow-auto rounded border border-gray-100 text-[10px]">
+        <div className={cn(tableContainer, 'max-h-36')}>
           <table className="w-full">
-            <thead className="sticky top-0 bg-gray-50">
+            <thead className="sticky top-0">
               <tr>
                 {displayColumns.map((col) => (
                   <th
                     key={col.name}
-                    className="whitespace-nowrap px-2 py-1 text-left font-medium text-gray-500"
+                    className={cn(tableHeader, 'whitespace-nowrap text-left')}
                   >
                     {col.name}
                   </th>

@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { Code2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useNodeExecution } from '@/hooks/useNodeExecution';
 import { DataPreview } from './DataPreview';
+import { caption, alertWarning, mutedBox, mutedBoxRow } from '@/design-system';
 import type { BaseNodeData } from '@/types';
 
 interface TransformNodeData extends BaseNodeData {
@@ -72,11 +74,11 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
       errorMessage={data.error}
     >
       <div className="space-y-2">
-        <p className="text-[10px] text-gray-500">
+        <p className={caption}>
           Edit code in the pipeline view (right panel).
         </p>
         {data.inputRowCount !== undefined && (
-          <div className="flex items-center justify-between rounded-md bg-gray-50 px-2 py-1 text-[10px] text-gray-500">
+          <div className={cn(mutedBox, mutedBoxRow, caption)}>
             <span>{data.inputRowCount.toLocaleString()} rows in</span>
             <span className="text-gray-300">&rarr;</span>
             <span className="font-medium text-gray-700">
@@ -85,7 +87,7 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
           </div>
         )}
         {!upstreamData && data.state === 'confirmed' && (
-          <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+          <div className={cn(alertWarning, '!mb-0')}>
             Connect a data source to process data
           </div>
         )}

@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import {
   Table,
   Filter,
@@ -13,6 +14,17 @@ import {
 import { nodeTypeInfos } from '@/components/nodes';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import {
+  label,
+  paletteItem,
+  paletteItemIcon,
+  paletteItemTitle,
+  paletteItemDescription,
+  captionMuted,
+  panelSection,
+  panelSectionHeader,
+  divider,
+} from '@/design-system';
 
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
@@ -53,45 +65,35 @@ export function NodePalette() {
     <>
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Data / get started */}
-        <div className="border-b border-gray-100 px-3 py-2">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Data
-          </p>
+        <div className={panelSection}>
+          <p className={label}>Data</p>
           <div className="flex flex-col gap-1.5">
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:bg-emerald-50/50"
+              className={paletteItem}
             >
-              <FileCode size={14} className="text-emerald-600" />
-              Import Python
+              <FileCode size={14} className={paletteItemIcon} />
+              <span className={paletteItemTitle}>Import Python</span>
             </button>
           </div>
         </div>
 
         {/* Node types — click to add */}
         <div className="flex-1 overflow-y-auto p-3">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
-            Nodes
-          </p>
+          <p className={label}>Nodes</p>
           <div className="space-y-1.5">
             {nodeTypeInfos.map((info) => (
               <button
                 key={info.type}
                 type="button"
                 onClick={() => handleAddNode(info.type)}
-                className="group flex w-full items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-left transition-all hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm"
+                className={paletteItem}
               >
-                <span className="flex-shrink-0 text-gray-400 group-hover:text-blue-500">
-                  {iconMap[info.icon]}
-                </span>
+                <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium text-gray-700 group-hover:text-gray-900">
-                    {info.label}
-                  </div>
-                  <div className="truncate text-[10px] text-gray-400">
-                    {info.description}
-                  </div>
+                  <div className={paletteItemTitle}>{info.label}</div>
+                  <div className={paletteItemDescription}>{info.description}</div>
                 </div>
               </button>
             ))}
@@ -99,8 +101,8 @@ export function NodePalette() {
         </div>
 
         {/* Footer hint */}
-        <div className="border-t border-gray-100 px-4 py-2.5">
-          <p className="text-center text-[10px] text-gray-400">
+        <div className={cn(divider, panelSectionHeader)}>
+          <p className={cn('text-center', captionMuted)}>
             Connect nodes by dragging between handles
           </p>
         </div>
