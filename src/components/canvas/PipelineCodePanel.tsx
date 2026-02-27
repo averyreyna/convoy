@@ -17,7 +17,23 @@ import { runFullPipelineScript } from '@/lib/pythonRunner';
 import { importPipelineFromPython, editNodes } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Copy, Download, FileCode, Play, Plus, Square, X, Wand2, ChevronDown, ChevronRight } from 'lucide-react';
-import { label, button, alert, panelSection, caption } from '@/design-system';
+import {
+  label,
+  button,
+  alert,
+  panelSection,
+  caption,
+  captionMuted,
+  notebookScrollArea,
+  notebookCellList,
+  notebookCell,
+  notebookCellFocused,
+  notebookCellSelected,
+  notebookCellGutter,
+  notebookCellPrompt,
+  notebookCellContent,
+  notebookCellHeader,
+} from '@/design-system';
 
 const EDITOR_OPTIONS = {
   readOnly: false,
@@ -567,13 +583,13 @@ export function PipelineCodePanel() {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-1.5">
+      <div className={cn(notebookScrollArea)}>
         {cells.length === 0 ? (
-          <p className="text-[11px] text-gray-400">
+          <p className={captionMuted}>
             Add nodes to see pipeline code, or use + to add a new cell.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className={notebookCellList}>
             {cells.map((cell, index) => {
               const isNodeBacked = !cell.nodeId.startsWith('draft-');
               const isSelected = isNodeBacked && selectedNodeIds.has(cell.nodeId);
@@ -611,20 +627,14 @@ export function PipelineCodePanel() {
                 role="button"
                 tabIndex={-1}
                 onClick={(e) => handleCellClick(e, cell, index)}
-                className={`rounded-lg border ring-2 ring-transparent transition-[border-color,box-shadow,background-color] duration-150 ${
-                  isFocused && isSelected
-                    ? 'border-blue-200 bg-blue-100/80 ring-blue-200'
-                    : isFocused
-                      ? 'border-blue-200 bg-blue-50/80 ring-blue-200'
-                      : isSelected
-                        ? 'border-blue-100 bg-blue-50/60 ring-blue-100'
-                        : 'border-gray-100 bg-gray-50/80'
-                }`}
+                className={cn(
+                  notebookCell,
+                  isFocused && notebookCellFocused,
+                  isSelected && notebookCellSelected
+                )}
               >
-                <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1">
-                  <span className={label}>
-                    {cell.label} ({cell.nodeType})
-                  </span>
+                <div className={notebookCellGutter}>
+                  <span className={notebookCellPrompt}>In [{index + 1}]:</span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -632,14 +642,24 @@ export function PipelineCodePanel() {
                       handleRunCell(index);
                     }}
                     disabled={isRunning}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50"
+                    className={cn(
+                      button.base,
+                      button.variants.ghost,
+                      'rounded p-0.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50'
+                    )}
                     title="Run up to this cell and propose nodes"
+                    aria-label="Run cell"
                   >
                     <Play size={10} />
-                    Run
                   </button>
                 </div>
-                <div className="overflow-hidden rounded-b-md border-0 border-gray-200">
+                <div className={notebookCellContent}>
+                  <div className={notebookCellHeader}>
+                    <span className={label}>
+                      {cell.label} ({cell.nodeType})
+                    </span>
+                  </div>
+                  <div className="overflow-hidden rounded-b-md border-0 border-gray-200">
                   <Editor
                     height={Math.min(
                       Math.max(MIN_EDITOR_HEIGHT, cell.code.split('\n').length * 16),
@@ -723,6 +743,7 @@ export function PipelineCodePanel() {
                     )}
                   </div>
                 )}
+                </div>
               </div>
             );
             })}

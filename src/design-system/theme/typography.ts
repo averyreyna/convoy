@@ -1,5 +1,5 @@
 /**
- * Design system typography tokens.
+ * Flank design system typography tokens.
  */
 export const fontFamily = {
   sans: "'ABC Diatype', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",

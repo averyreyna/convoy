@@ -1,5 +1,5 @@
 /**
- * Design system public API.
+ * Flank design system public API.
  * Import theme once in main.tsx; components import recipes from here.
  */
 
@@ -60,6 +60,17 @@ export { tableContainer, tableHeader } from './components/ui/TableContainer.css.
 
 // Canvas (node / palette)
 export { nodeHeader, nodeHeaderTitle, nodeHandle } from './components/canvas/NodeHeader.css.ts';
+export {
+  notebookScrollArea,
+  notebookCellList,
+  notebookCell,
+  notebookCellFocused,
+  notebookCellSelected,
+  notebookCellGutter,
+  notebookCellPrompt,
+  notebookCellContent,
+  notebookCellHeader,
+} from './components/canvas/NotebookCell.css.ts';
 export {
   paletteItem,
   paletteItemIcon,

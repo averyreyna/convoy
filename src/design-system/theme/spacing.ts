@@ -1,5 +1,5 @@
 /**
- * Design system spacing scale (Tailwind default: 1 unit = 0.25rem = 4px).
+ * Flank design system spacing scale (Tailwind default: 1 unit = 0.25rem = 4px).
  */
 export const spacing = {
   0: '0',

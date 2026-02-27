@@ -7,6 +7,7 @@ import importPythonRouter from './routes/import/python.ts';
 import dataRouter from './routes/data.ts';
 import healthRouter from './routes/health.ts';
 import editNodesRouter from './routes/editNodes.ts';
+import answerAboutNodesRouter from './routes/answerAboutNodes.ts';
 
 const app = express();
 
@@ -16,6 +17,7 @@ const PORT = process.env.PORT || 3001;
 
 app.use('/api', pipelineRouter);
 app.use('/api', editNodesRouter);
+app.use('/api', answerAboutNodesRouter);
 app.use('/api', explainRouter);
 app.use('/api', dataRouter);
 app.use('/api', healthRouter);

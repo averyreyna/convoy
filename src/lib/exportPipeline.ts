@@ -41,21 +41,23 @@ export function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
   return sorted.map((id) => nodeMap.get(id)!).filter(Boolean);
 }
 
-const AI_QUERY_NODE_TYPE = 'aiQuery';
+const META_NODE_TYPES = ['aiQuery', 'aiAdvisor'] as const;
 
 /**
- * Exclude AI query (meta) nodes and their edges from the pipeline.
+ * Exclude AI/meta nodes (e.g. aiQuery, aiAdvisor) and their edges from the pipeline.
  * Used for export and Run all so only data-processing nodes are included.
  */
 export function pipelineNodesOnly(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
-  const nodesFiltered = nodes.filter((n) => (n.type as string) !== AI_QUERY_NODE_TYPE);
+  const nodesFiltered = nodes.filter(
+    (n) => !META_NODE_TYPES.includes(n.type as (typeof META_NODE_TYPES)[number])
+  );
   const idSet = new Set(nodesFiltered.map((n) => n.id));
   const edgesFiltered = edges.filter((e) => idSet.has(e.source) && idSet.has(e.target));
   return { nodes: nodesFiltered, edges: edgesFiltered };
 }
 
 /**
- * Topological order of pipeline nodes only (excludes aiQuery).
+ * Topological order of pipeline nodes only (excludes aiQuery, aiAdvisor).
  */
 export function topologicalSortPipeline(nodes: Node[], edges: Edge[]): Node[] {
   const { nodes: pNodes, edges: pEdges } = pipelineNodesOnly(nodes, edges);

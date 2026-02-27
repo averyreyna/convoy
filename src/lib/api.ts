@@ -10,9 +10,10 @@ import type {
   EditNodesPipelineContext,
   EditNodesResponse,
   SuggestedPipelineNode,
+  AnswerAboutNodesResponse,
 } from '@/types';
 
-export type { EditNodesSchema, EditNodesPipelineContext, EditNodesResponse, SuggestedPipelineNode };
+export type { EditNodesSchema, EditNodesPipelineContext, EditNodesResponse, SuggestedPipelineNode, AnswerAboutNodesResponse };
 
 /**
  * Base URL for API requests. Use relative URLs (empty string) so the app works
@@ -171,5 +172,47 @@ export async function editNodes(params: {
   if (import.meta.env.DEV) {
     console.log('[editNodes] Response', nodeCount === 0 ? 'empty suggestedPipeline' : { suggestedNodeCount: nodeCount });
   }
+  return data;
+}
+
+/**
+ * Get advice about connected nodes. Sends node IDs, question, optional schema and pipeline context.
+ * Returns a text answer (advice, next steps, feedback). No pipeline edits.
+ */
+export async function answerAboutNodes(params: {
+  nodeIds: string[];
+  question: string;
+  schema?: EditNodesSchema;
+  pipelineContext?: EditNodesPipelineContext;
+}): Promise<AnswerAboutNodesResponse> {
+  const { nodeIds, question, schema, pipelineContext } = params;
+
+  const url = `${API_BASE || ''}/api/answer-about-nodes`.replace(/\/+/, '/');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nodeIds,
+      question,
+      ...(schema && { schema }),
+      ...(pipelineContext && { pipelineContext }),
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    let message: string;
+    try {
+      const body = JSON.parse(text) as { error?: string };
+      message = body.error || `Answer about nodes failed (${response.status})`;
+    } catch {
+      message = text
+        ? `Answer about nodes failed (${response.status}). ${text.slice(0, 200)}`
+        : `Answer about nodes failed (${response.status}). No details from server.`;
+    }
+    throw new Error(message);
+  }
+
+  const data: AnswerAboutNodesResponse = await response.json();
   return data;
 }

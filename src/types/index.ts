@@ -75,6 +75,11 @@ export interface ReshapeNodeData extends BaseNodeData {
   outputRowCount?: number;
 }
 
+export interface AiAdvisorNodeData extends BaseNodeData {
+  question?: string;
+  answer?: string;
+}
+
 export type ConvoyNodeData =
   | DataSourceNodeData
   | FilterNodeData
@@ -83,7 +88,8 @@ export type ConvoyNodeData =
   | SelectNodeData
   | ChartNodeData
   | ComputedColumnNodeData
-  | ReshapeNodeData;
+  | ReshapeNodeData
+  | AiAdvisorNodeData;
 
 export interface ProposedPipeline {
   nodes: Array<{
@@ -144,4 +150,9 @@ export interface EditNodesResponse {
   /** Ordered list of nodes that replace the selection; edges are implicit (chain). */
   suggestedPipeline?: { nodes: SuggestedPipelineNode[] };
   explanation?: string;
+}
+
+/** Response from POST /api/answer-about-nodes (advice about connected nodes). */
+export interface AnswerAboutNodesResponse {
+  answer: string;
 }
