@@ -9,8 +9,8 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react';
-import type { ProposedPipeline } from '@/types';
-import { topologicalSort } from '@/lib/exportPipeline';
+import type { ProposedPipeline, SuggestedPipelineNode } from '@/types';
+import { topologicalSortPipeline } from '@/lib/exportPipeline';
 import { usePreferencesStore } from './preferencesStore';
 
 export interface ApplyImportOptions {
@@ -40,6 +40,7 @@ interface CanvasStore {
   // Per-node baseline for inline diff: "Pin selection" writes selected nodes' config/code here
   baselineByNodeId: Record<string, { config: Record<string, unknown>; customCode?: string }>;
   setBaselineForSelection: () => void;
+  setBaselineForNodeIds: (nodeIds: string[]) => void;
   clearNodeBaseline: (nodeId: string) => void;
   clearAllNodeBaselines: () => void;
 
@@ -57,6 +58,7 @@ interface CanvasStore {
   addProposedPipeline: (pipeline: ProposedPipeline) => void;
   setPipelineFromImport: (pipeline: ProposedPipeline) => void;
   applyImportToExistingPipeline: (pipeline: ProposedPipeline, options?: ApplyImportOptions) => void;
+  replaceNodesWithSuggestedPipeline: (nodeIdsToReplace: string[], suggested: { nodes: SuggestedPipelineNode[] }, options?: { insertAfterNodeId?: string }) => void;
   confirmAllProposed: () => void;
   clearProposed: () => void;
 
@@ -103,6 +105,25 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         const data = (node.data || {}) as Record<string, unknown>;
         const { state: _nodeState, label: _l, error: _e, inputRowCount: _i, outputRowCount: _o, ...config } = data;
         next[node.id] = {
+          config: { ...config },
+          customCode: typeof data.customCode === 'string' ? data.customCode : undefined,
+        };
+      }
+      return { baselineByNodeId: next };
+    }),
+  setBaselineForNodeIds: (nodeIds) =>
+    set((state) => {
+      if (nodeIds.length === 0) return state;
+      const nodeMap = new Map(state.nodes.map((n) => [n.id, n]));
+      const next: Record<string, { config: Record<string, unknown>; customCode?: string }> = {
+        ...state.baselineByNodeId,
+      };
+      for (const id of nodeIds) {
+        const node = nodeMap.get(id);
+        if (!node) continue;
+        const data = (node.data || {}) as Record<string, unknown>;
+        const { state: _nodeState, label: _l, error: _e, inputRowCount: _i, outputRowCount: _o, ...config } = data;
+        next[id] = {
           config: { ...config },
           customCode: typeof data.customCode === 'string' ? data.customCode : undefined,
         };
@@ -311,7 +332,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const pipelineNodes = pipeline.nodes || [];
     if (pipelineNodes.length === 0) return;
 
-    const orderedNodes = topologicalSort(existingNodes, existingEdges);
+    const orderedNodes = topologicalSortPipeline(existingNodes, existingEdges);
     if (orderedNodes.length === 0) return;
 
     const upToIndex = options?.upToIndex;
@@ -391,6 +412,114 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     } else {
       set({ nodes: updatedNodes });
     }
+  },
+
+  replaceNodesWithSuggestedPipeline: (nodeIdsToReplace, suggested, options) => {
+    const { nodes: existingNodes, edges: existingEdges } = get();
+    const suggestedNodes = suggested?.nodes ?? [];
+    if (suggestedNodes.length === 0) return;
+
+    const insertAfterNodeId = options?.insertAfterNodeId;
+    const isInsertMode = nodeIdsToReplace.length === 0 && insertAfterNodeId;
+
+    let toReplace: Set<string>;
+    let upstreamIds: string[];
+    let downstreamIds: string[];
+    let nodesAfterRemoval: Node[];
+    let edgesAfterRemoval: Edge[];
+    let basePosition: { x: number; y: number };
+
+    if (isInsertMode) {
+      toReplace = new Set();
+      const outgoingFromInsert = existingEdges.filter((e) => e.source === insertAfterNodeId);
+      downstreamIds = [...new Set(outgoingFromInsert.map((e) => e.target))];
+      upstreamIds = [insertAfterNodeId];
+      nodesAfterRemoval = existingNodes;
+      edgesAfterRemoval = existingEdges.filter(
+        (e) => !(e.source === insertAfterNodeId && downstreamIds.includes(e.target))
+      );
+      const insertNode = existingNodes.find((n) => n.id === insertAfterNodeId);
+      basePosition = insertNode
+        ? { x: insertNode.position.x + 320, y: insertNode.position.y }
+        : { x: 120, y: 120 };
+    } else {
+      toReplace = new Set(nodeIdsToReplace);
+      const incomingEdges = existingEdges.filter((e) => toReplace.has(e.target));
+      const outgoingEdges = existingEdges.filter((e) => toReplace.has(e.source));
+      upstreamIds = [...new Set(incomingEdges.map((e) => e.source))].filter((id) => !toReplace.has(id));
+      downstreamIds = [...new Set(outgoingEdges.map((e) => e.target))].filter((id) => !toReplace.has(id));
+      nodesAfterRemoval = existingNodes.filter((n) => !toReplace.has(n.id));
+      edgesAfterRemoval = existingEdges.filter(
+        (e) => !toReplace.has(e.source) && !toReplace.has(e.target)
+      );
+      const firstRemoved = existingNodes.find((n) => toReplace.has(n.id));
+      const firstUpstream = upstreamIds.length > 0 ? existingNodes.find((n) => n.id === upstreamIds[0]) : null;
+      basePosition = firstRemoved
+        ? { x: firstRemoved.position.x, y: firstRemoved.position.y }
+        : firstUpstream
+          ? { x: firstUpstream.position.x + 320, y: firstUpstream.position.y }
+          : { x: 120, y: 120 };
+    }
+
+    const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
+    const validTypes = new Set(['dataSource', 'filter', 'groupBy', 'sort', 'select', 'chart', 'computedColumn', 'reshape', 'transform']);
+    const timestamp = Date.now();
+    const newNodes: Node[] = [];
+    const newEdges: Edge[] = [];
+    let xOffset = basePosition.x;
+    const yPos = basePosition.y;
+    let previousNodeId: string | null = upstreamIds.length > 0 ? upstreamIds[0] : null;
+
+    for (let i = 0; i < suggestedNodes.length; i++) {
+      const spec = suggestedNodes[i];
+      const nodeType = spec.type && validTypes.has(spec.type) ? spec.type : 'transform';
+      const supportsCodeMode = nodeType !== 'dataSource' && nodeType !== 'transform';
+      const nodeId = `ai-${timestamp}-${i}`;
+
+      const data: Record<string, unknown> = {
+        state: 'confirmed' as const,
+        label: spec.label ?? nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
+        ...(spec.config ?? {}),
+        ...(spec.customCode !== undefined && spec.customCode !== '' ? { customCode: spec.customCode } : {}),
+        ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
+      };
+
+      newNodes.push({
+        id: nodeId,
+        type: nodeType,
+        position: { x: xOffset, y: yPos },
+        data,
+      });
+
+      if (previousNodeId) {
+        newEdges.push({
+          id: `edge-${previousNodeId}-${nodeId}`,
+          source: previousNodeId,
+          target: nodeId,
+          type: 'dataFlow',
+          animated: true,
+        });
+      }
+      previousNodeId = nodeId;
+      xOffset += 320;
+    }
+
+    if (previousNodeId) {
+      for (const targetId of downstreamIds) {
+        newEdges.push({
+          id: `edge-${previousNodeId}-${targetId}`,
+          source: previousNodeId,
+          target: targetId,
+          type: 'dataFlow',
+          animated: true,
+        });
+      }
+    }
+
+    set({
+      nodes: [...nodesAfterRemoval, ...newNodes],
+      edges: [...edgesAfterRemoval, ...newEdges],
+    });
   },
 
   confirmAllProposed: () =>

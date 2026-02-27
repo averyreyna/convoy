@@ -41,6 +41,29 @@ export function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
   return sorted.map((id) => nodeMap.get(id)!).filter(Boolean);
 }
 
+const META_NODE_TYPES = ['aiQuery', 'aiAdvisor'] as const;
+
+/**
+ * Exclude AI/meta nodes (e.g. aiQuery, aiAdvisor) and their edges from the pipeline.
+ * Used for export and Run all so only data-processing nodes are included.
+ */
+export function pipelineNodesOnly(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
+  const nodesFiltered = nodes.filter(
+    (n) => !META_NODE_TYPES.includes(n.type as (typeof META_NODE_TYPES)[number])
+  );
+  const idSet = new Set(nodesFiltered.map((n) => n.id));
+  const edgesFiltered = edges.filter((e) => idSet.has(e.source) && idSet.has(e.target));
+  return { nodes: nodesFiltered, edges: edgesFiltered };
+}
+
+/**
+ * Topological order of pipeline nodes only (excludes aiQuery, aiAdvisor).
+ */
+export function topologicalSortPipeline(nodes: Node[], edges: Edge[]): Node[] {
+  const { nodes: pNodes, edges: pEdges } = pipelineNodesOnly(nodes, edges);
+  return topologicalSort(pNodes, pEdges);
+}
+
 /**
  * Get the generated or custom code for a node.
  */
@@ -70,7 +93,7 @@ function getNodeCode(node: Node): { code: string; nodeType: string; label: strin
 // ─── Python Export ──────────────────────────────────────────────────────────
 
 export function exportAsPython(nodes: Node[], edges: Edge[]): string {
-  const sorted = topologicalSort(nodes, edges);
+  const sorted = topologicalSortPipeline(nodes, edges);
   const sections: string[] = [];
 
   sections.push(`# Convoy Pipeline — Exported Python
@@ -254,7 +277,7 @@ interface NotebookCodeCell {
  * Build Jupyter notebook (.ipynb) JSON from the pipeline.
  */
 export function exportAsNotebookJson(nodes: Node[], edges: Edge[]): string {
-  const sorted = topologicalSort(nodes, edges);
+  const sorted = topologicalSortPipeline(nodes, edges);
   const cells: NotebookCodeCell[] = [];
 
   cells.push({
@@ -315,7 +338,7 @@ export function downloadNotebook(nodes: Node[], edges: Edge[]) {
  * Copy pipeline as Jupyter-style cells (each block separated by "# %%") for pasting into VS Code / Jupyter.
  */
 export function copyAsJupyterCells(nodes: Node[], edges: Edge[]): string {
-  const sorted = topologicalSort(nodes, edges);
+  const sorted = topologicalSortPipeline(nodes, edges);
   const parts: string[] = ['# %%\nimport pandas as pd\n'];
   for (const node of sorted) {
     const { code, label } = getNodeCode(node);

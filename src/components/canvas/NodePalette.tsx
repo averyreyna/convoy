@@ -10,6 +10,8 @@ import {
   Calculator,
   FlipVertical2,
   FileCode,
+  Sparkles,
+  MessageCircle,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -36,6 +38,8 @@ const iconMap: Record<string, React.ReactNode> = {
   barChart3: <BarChart3 size={16} />,
   calculator: <Calculator size={16} />,
   flipVertical2: <FlipVertical2 size={16} />,
+  sparkles: <Sparkles size={16} />,
+  messageCircle: <MessageCircle size={16} />,
 };
 
 export function NodePalette() {
@@ -47,7 +51,8 @@ export function NodePalette() {
   const handleAddNode = (type: string) => {
     const info = nodeTypeInfos.find((n) => n.type === type);
     if (!info) return;
-    const supportsCodeMode = type !== 'dataSource' && type !== 'transform';
+    const supportsCodeMode =
+      type !== 'dataSource' && type !== 'transform' && type !== 'aiQuery' && type !== 'aiAdvisor';
     const x = 120 + nodes.length * 320;
     const y = 120;
     addNode({

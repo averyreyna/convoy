@@ -1,5 +1,5 @@
 /**
- * Design system color tokens (Tailwind default palette).
+ * Flank design system color tokens (Tailwind default palette).
  * Used by theme index to create CSS variables.
  */
 export const colors = {

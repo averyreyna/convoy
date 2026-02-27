@@ -1,5 +1,5 @@
 /**
- * Design system border radius tokens.
+ * Flank design system border radius tokens.
  */
 export const radii = {
   none: '0',

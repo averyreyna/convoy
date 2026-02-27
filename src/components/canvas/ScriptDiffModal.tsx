@@ -1,6 +1,6 @@
-import { useMemo, useEffect, useCallback } from 'react';
+import { useMemo, useEffect } from 'react';
 import { diffLines, type Change } from 'diff';
-import { X, Pin, Trash2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { exportAsPython } from '@/lib/exportPipeline';
@@ -15,7 +15,7 @@ import {
   panelSectionHeader,
 } from '@/design-system';
 
-const PLACEHOLDER = 'No baseline—import code or pin current';
+const PLACEHOLDER = 'No baseline—run the pipeline to see changes';
 
 interface ScriptDiffModalProps {
   isOpen: boolean;
@@ -60,8 +60,6 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const baselineCode = useCanvasStore((s) => s.baselineCode);
-  const setBaselineFromPin = useCanvasStore((s) => s.setBaselineFromPin);
-  const clearBaseline = useCanvasStore((s) => s.clearBaseline);
 
   const currentExport = useMemo(() => {
     if (nodes.length === 0) return '';
@@ -76,12 +74,6 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
     if (!hasBaseline) return null;
     return buildDiffRows(leftText, rightText);
   }, [leftText, rightText, hasBaseline]);
-
-  const handlePinCurrent = useCallback(() => {
-    if (currentExport) {
-      setBaselineFromPin(currentExport, 'python');
-    }
-  }, [currentExport, setBaselineFromPin]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -105,32 +97,6 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
             <span className={cn(badge.base, badge.variants.neutral)}>Python</span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePinCurrent}
-              disabled={!currentExport}
-              className={cn(
-                button.base,
-                button.variants.secondary,
-                button.sizes.sm,
-                'disabled:opacity-50'
-              )}
-              title="Set baseline to current export"
-            >
-              <Pin size={14} />
-              Pin current
-            </button>
-            {hasBaseline && (
-              <button
-                type="button"
-                onClick={() => clearBaseline()}
-                className={cn(button.base, button.variants.danger, button.sizes.sm)}
-                title="Clear baseline"
-              >
-                <Trash2 size={14} />
-                Clear baseline
-              </button>
-            )}
             <button
               type="button"
               onClick={onClose}

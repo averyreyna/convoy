@@ -3,7 +3,7 @@ import express from 'express';
 const router = express.Router();
 
 router.get('/fetch-csv', async (req, res) => {
-  const { url } = req.query;
+  const { url } = req.query as { url?: string };
 
   if (!url || typeof url !== 'string') {
     return res.status(400).send('Missing url parameter');
@@ -17,7 +17,7 @@ router.get('/fetch-csv', async (req, res) => {
 
     const response = await fetch(url, {
       headers: {
-        'Accept': 'text/csv, text/plain, */*',
+        Accept: 'text/csv, text/plain, */*',
         'User-Agent': 'Convoy/1.0',
       },
       signal: AbortSignal.timeout(15000),
@@ -30,11 +30,12 @@ router.get('/fetch-csv', async (req, res) => {
     const text = await response.text();
     res.type('text/csv').send(text);
   } catch (error) {
-    console.error('CSV fetch error:', error.message);
-    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+    const err = error as NodeJS.ErrnoException & { name?: string };
+    console.error('CSV fetch error:', err.message);
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
       return res.status(504).send('Request timed out');
     }
-    res.status(500).send(error.message || 'Failed to fetch URL');
+    res.status(500).send(err.message || 'Failed to fetch URL');
   }
 });
 

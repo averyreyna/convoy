@@ -75,6 +75,11 @@ export interface ReshapeNodeData extends BaseNodeData {
   outputRowCount?: number;
 }
 
+export interface AiAdvisorNodeData extends BaseNodeData {
+  question?: string;
+  answer?: string;
+}
+
 export type ConvoyNodeData =
   | DataSourceNodeData
   | FilterNodeData
@@ -83,7 +88,8 @@ export type ConvoyNodeData =
   | SelectNodeData
   | ChartNodeData
   | ComputedColumnNodeData
-  | ReshapeNodeData;
+  | ReshapeNodeData
+  | AiAdvisorNodeData;
 
 export interface ProposedPipeline {
   nodes: Array<{
@@ -106,4 +112,47 @@ export interface NodeTypeInfo {
   defaultData: Partial<ConvoyNodeData>;
   inputs: number;
   outputs: number;
+}
+
+// Edit-nodes API (shared with server)
+export interface EditNodesSchema {
+  columns: Array<{ name: string; type: string }>;
+}
+
+export interface EditNodesPipelineContext {
+  nodes: Array<{
+    id: string;
+    type?: string;
+    position?: { x: number; y: number };
+    data?: Record<string, unknown>;
+  }>;
+  edges: Array<{ id: string; source: string; target: string }>;
+}
+
+export interface EditNodesRequestBody {
+  nodeIds: string[];
+  prompt: string;
+  schema?: EditNodesSchema;
+  pipelineContext?: EditNodesPipelineContext;
+}
+
+/** A single node in an AI-suggested pipeline fragment (replaces selection). */
+export interface SuggestedPipelineNode {
+  type: string;
+  config?: Record<string, unknown>;
+  customCode?: string;
+  label?: string;
+}
+
+export interface EditNodesResponse {
+  /** @deprecated Use suggestedPipeline. Per-node patches keyed by existing node ID. */
+  updates?: Record<string, { config?: Record<string, unknown>; customCode?: string }>;
+  /** Ordered list of nodes that replace the selection; edges are implicit (chain). */
+  suggestedPipeline?: { nodes: SuggestedPipelineNode[] };
+  explanation?: string;
+}
+
+/** Response from POST /api/answer-about-nodes (advice about connected nodes). */
+export interface AnswerAboutNodesResponse {
+  answer: string;
 }
