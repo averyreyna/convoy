@@ -1,8 +1,9 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
-import express from 'express';
-import { getClient } from '../../lib/ai.js';
+import express, { Request, Response } from 'express';
+import { getClient } from '../../lib/ai.ts';
+import type { ProposedPipeline } from '../../../src/types/index.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,21 +38,35 @@ Rules:
 5. For groupBy with count, set aggregateColumn to groupByColumn.
 6. If the script has plotting (matplotlib/plt), add a chart node with appropriate chartType and axes from the plot.`;
 
-function runPythonAstParser(source) {
+interface AstStep {
+  type: string;
+  config?: Record<string, unknown>;
+}
+
+interface AstParserResult {
+  steps?: AstStep[];
+  fallbackToLlm?: boolean;
+}
+
+function runPythonAstParser(source: string): Promise<AstParserResult> {
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'parse_python_pipeline.py');
     const proc = spawn('python3', [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
-    proc.stdout.on('data', (chunk) => { stdout += chunk; });
-    proc.stderr.on('data', (chunk) => { stderr += chunk; });
-    proc.stdin.write(source, (err) => {
+    proc.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk;
+    });
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk;
+    });
+    proc.stdin?.write(source, (err) => {
       if (err) {
         proc.kill();
         reject(err);
         return;
       }
-      proc.stdin.end();
+      proc.stdin?.end();
     });
     proc.on('close', (code) => {
       if (code !== 0) {
@@ -59,9 +74,9 @@ function runPythonAstParser(source) {
         return;
       }
       try {
-        const result = JSON.parse(stdout);
+        const result = JSON.parse(stdout) as AstParserResult;
         resolve(result);
-      } catch (e) {
+      } catch {
         reject(new Error('Invalid JSON from Python parser'));
       }
     });
@@ -69,18 +84,22 @@ function runPythonAstParser(source) {
   });
 }
 
-router.post('/', async (req, res) => {
-  const { source } = req.body;
+interface ImportRequestBody {
+  source?: string;
+}
+
+router.post('/', async (req: Request, res: Response) => {
+  const { source } = req.body as ImportRequestBody;
 
   if (!source || typeof source !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid source' });
   }
 
-  let astResult = null;
+  let astResult: AstParserResult | null = null;
   try {
     astResult = await runPythonAstParser(source);
   } catch (err) {
-    console.warn('Import from Python: AST parser failed, using LLM', err.message);
+    console.warn('Import from Python: AST parser failed, using LLM', (err as Error).message);
   }
 
   const useLlm =
@@ -89,8 +108,8 @@ router.post('/', async (req, res) => {
     !astResult.steps ||
     astResult.steps.length === 0;
 
-  if (!useLlm && astResult.steps.length > 0) {
-    const pipeline = {
+  if (!useLlm && astResult?.steps && astResult.steps.length > 0) {
+    const pipeline: ProposedPipeline = {
       nodes: astResult.steps.map((s) => ({ type: s.type, config: s.config || {} })),
       explanation: 'Imported from Python script (AST).',
     };
@@ -100,7 +119,8 @@ router.post('/', async (req, res) => {
   const client = getClient();
   if (!client) {
     return res.status(503).json({
-      error: 'Import from Python requires ANTHROPIC_API_KEY when the script cannot be parsed automatically.',
+      error:
+        'Import from Python requires ANTHROPIC_API_KEY when the script cannot be parsed automatically.',
     });
   }
 
@@ -128,7 +148,7 @@ router.post('/', async (req, res) => {
       throw new Error('No JSON found in Claude response');
     }
 
-    const pipeline = JSON.parse(jsonMatch[0]);
+    const pipeline = JSON.parse(jsonMatch[0]) as ProposedPipeline;
     if (!pipeline.nodes || !Array.isArray(pipeline.nodes)) {
       throw new Error('Invalid pipeline structure: missing nodes array');
     }
@@ -140,7 +160,7 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Import from Python (LLM) error:', error);
     res.status(500).json({
-      error: error.message || 'Failed to import pipeline from Python.',
+      error: (error as Error).message || 'Failed to import pipeline from Python.',
     });
   }
 });

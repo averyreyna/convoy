@@ -9,6 +9,7 @@ import { TransformNode } from './TransformNode';
 import { ChartNode } from './ChartNode';
 import { ComputedColumnNode } from './ComputedColumnNode';
 import { ReshapeNode } from './ReshapeNode';
+import { AiQueryNode } from './AiQueryNode';
 
 /**
  * Registry of all custom node types for React Flow.
@@ -23,6 +24,7 @@ export const nodeTypes: NodeTypes = {
   chart: ChartNode,
   computedColumn: ComputedColumnNode,
   reshape: ReshapeNode,
+  aiQuery: AiQueryNode,
 };
 
 /**
@@ -107,6 +109,15 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     description: 'Render visualization',
     icon: 'barChart3',
     defaultData: { state: 'proposed', label: 'Chart', isCodeMode: true },
+    inputs: 1,
+    outputs: 0,
+  },
+  {
+    type: 'aiQuery',
+    label: 'Query with AI',
+    description: 'Describe changes in natural language; connect nodes as context',
+    icon: 'sparkles',
+    defaultData: { state: 'confirmed', label: 'Query with AI' },
     inputs: 1,
     outputs: 0,
   },

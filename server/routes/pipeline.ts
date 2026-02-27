@@ -1,5 +1,6 @@
-import express from 'express';
-import { getClient } from '../lib/ai.js';
+import express, { Request, Response } from 'express';
+import { getClient } from '../lib/ai.ts';
+import type { ProposedPipeline } from '../../src/types/index.ts';
 
 const router = express.Router();
 
@@ -32,12 +33,25 @@ Rules:
 6. For groupBy with "count" aggregation, set aggregateColumn to the groupByColumn.
 7. The yAxis in the chart node should match the output column name after transformations (e.g., after a count groupBy, the yAxis is the aggregateColumn name).`;
 
-function generateMockPipeline(prompt, schema) {
+interface SchemaColumn {
+  name: string;
+  type: string;
+}
+
+interface PipelineRequestBody {
+  prompt?: string;
+  schema?: { columns?: SchemaColumn[] };
+}
+
+function generateMockPipeline(
+  prompt: string,
+  schema: { columns?: SchemaColumn[] }
+): ProposedPipeline {
   const columns = schema.columns || [];
   const numericCols = columns.filter((c) => c.type === 'number');
   const stringCols = columns.filter((c) => c.type === 'string');
 
-  const nodes = [];
+  const nodes: ProposedPipeline['nodes'] = [];
   const promptLower = prompt.toLowerCase();
 
   const hasFilter =
@@ -75,9 +89,7 @@ function generateMockPipeline(prompt, schema) {
       config: {
         groupByColumn: stringCols[0].name,
         aggregateColumn:
-          numericCols.length > 0
-            ? numericCols[0].name
-            : stringCols[0].name,
+          numericCols.length > 0 ? numericCols[0].name : stringCols[0].name,
         aggregation: numericCols.length > 0 ? 'sum' : 'count',
       },
     });
@@ -92,7 +104,7 @@ function generateMockPipeline(prompt, schema) {
     });
   }
 
-  let chartType = 'bar';
+  let chartType: 'bar' | 'line' | 'area' | 'scatter' | 'pie' = 'bar';
   if (promptLower.includes('line')) chartType = 'line';
   else if (promptLower.includes('area')) chartType = 'area';
   else if (promptLower.includes('scatter')) chartType = 'scatter';
@@ -112,8 +124,8 @@ function generateMockPipeline(prompt, schema) {
   };
 }
 
-router.post('/generate-pipeline', async (req, res) => {
-  const { prompt, schema } = req.body;
+router.post('/generate-pipeline', async (req: Request, res: Response) => {
+  const { prompt, schema } = req.body as PipelineRequestBody;
 
   if (!prompt || !schema) {
     return res.status(400).json({ error: 'Missing prompt or schema' });
@@ -150,7 +162,7 @@ router.post('/generate-pipeline', async (req, res) => {
       throw new Error('No JSON found in Claude response');
     }
 
-    const pipeline = JSON.parse(jsonMatch[0]);
+    const pipeline = JSON.parse(jsonMatch[0]) as ProposedPipeline;
 
     if (!pipeline.nodes || !Array.isArray(pipeline.nodes)) {
       throw new Error('Invalid pipeline structure: missing nodes array');

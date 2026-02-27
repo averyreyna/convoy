@@ -3,15 +3,23 @@
  * Communicates with the Express backend that wraps the Anthropic Claude API.
  */
 
-import type { ProposedPipeline, ImportFromPythonResponse } from '@/types';
+import type {
+  ProposedPipeline,
+  ImportFromPythonResponse,
+  EditNodesSchema,
+  EditNodesPipelineContext,
+  EditNodesResponse,
+  SuggestedPipelineNode,
+} from '@/types';
+
+export type { EditNodesSchema, EditNodesPipelineContext, EditNodesResponse, SuggestedPipelineNode };
 
 /**
- * Base URL for API requests. In dev we default to the backend so the request
- * always hits our server (avoids proxy 404). Override with VITE_API_URL if needed.
+ * Base URL for API requests. Use relative URLs (empty string) so the app works
+ * with the Vite proxy in dev and same-origin in production. Override with
+ * VITE_API_URL only when you need to point at a different API host.
  */
-const API_BASE =
-  (import.meta.env.VITE_API_URL as string) ||
-  (import.meta.env.DEV ? 'http://localhost:3001' : '');
+const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
 
 interface DataSchema {
   columns: Array<{ name: string; type: string }>;
@@ -112,25 +120,10 @@ export async function importPipelineFromPython(
   return data;
 }
 
-/** Schema for edit-nodes (optional). */
-export interface EditNodesSchema {
-  columns: Array<{ name: string; type: string }>;
-}
-
-/** Pipeline context for edit-nodes (optional). */
-export interface EditNodesPipelineContext {
-  nodes: Array<{ id: string; type?: string; position?: { x: number; y: number }; data?: Record<string, unknown> }>;
-  edges: Array<{ id: string; source: string; target: string }>;
-}
-
-/** Response from edit-nodes API. */
-export interface EditNodesResponse {
-  updates: Record<string, { config?: Record<string, unknown>; customCode?: string }>;
-}
-
 /**
  * Edit selected nodes with AI. Sends selected node IDs, prompt, optional schema and pipeline context.
- * Returns per-node updates (config and/or customCode) to apply via updateNode.
+ * Returns a suggested pipeline fragment (ordered nodes) that replaces the selection. Callers should
+ * check suggestedPipeline?.nodes?.length before applying; empty or missing means no suggestion.
  */
 export async function editNodes(params: {
   nodeIds: string[];
@@ -140,7 +133,12 @@ export async function editNodes(params: {
 }): Promise<EditNodesResponse> {
   const { nodeIds, prompt, schema, pipelineContext } = params;
 
-  const response = await fetch(`${API_BASE}/api/edit-nodes`, {
+  const url = `${API_BASE || ''}/api/edit-nodes`.replace(/\/+/, '/');
+  if (import.meta.env.DEV) {
+    console.log('[editNodes] Request', { url: url || '(relative)', nodeIds, promptLength: prompt.length });
+  }
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -162,9 +160,16 @@ export async function editNodes(params: {
         ? `Edit nodes failed (${response.status}). ${text.slice(0, 200)}`
         : `Edit nodes failed (${response.status}). No details from server.`;
     }
+    if (import.meta.env.DEV) {
+      console.error('[editNodes] Request failed', response.status, message);
+    }
     throw new Error(message);
   }
 
   const data: EditNodesResponse = await response.json();
+  const nodeCount = data.suggestedPipeline?.nodes?.length ?? 0;
+  if (import.meta.env.DEV) {
+    console.log('[editNodes] Response', nodeCount === 0 ? 'empty suggestedPipeline' : { suggestedNodeCount: nodeCount });
+  }
   return data;
 }
