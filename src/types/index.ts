@@ -1,7 +1,5 @@
-// Node states
 export type NodeState = 'proposed' | 'confirmed' | 'running' | 'error';
 
-// Data types
 export interface Column {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'date';
@@ -12,7 +10,6 @@ export interface DataFrame {
   rows: Record<string, unknown>[];
 }
 
-// Base node data
 export interface BaseNodeData {
   state: NodeState;
   label: string;
@@ -21,7 +18,6 @@ export interface BaseNodeData {
   error?: string;
 }
 
-// Specific node data types
 export interface DataSourceNodeData extends BaseNodeData {
   fileName?: string;
   rowCount?: number;
@@ -79,7 +75,6 @@ export interface ReshapeNodeData extends BaseNodeData {
   outputRowCount?: number;
 }
 
-// Union type for all node data
 export type ConvoyNodeData =
   | DataSourceNodeData
   | FilterNodeData
@@ -90,7 +85,6 @@ export type ConvoyNodeData =
   | ComputedColumnNodeData
   | ReshapeNodeData;
 
-// Pipeline from AI
 export interface ProposedPipeline {
   nodes: Array<{
     type: string;
@@ -99,13 +93,11 @@ export interface ProposedPipeline {
   explanation: string;
 }
 
-// Response from import-from-python API
 export interface ImportFromPythonResponse {
   pipeline: ProposedPipeline;
   method?: 'ast' | 'llm';
 }
 
-// Node type metadata for the palette
 export interface NodeTypeInfo {
   type: string;
   label: string;

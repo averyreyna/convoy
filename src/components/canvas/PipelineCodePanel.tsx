@@ -13,7 +13,9 @@ import {
 } from '@/lib/exportPipeline';
 import { runFullPipelineScript } from '@/lib/pythonRunner';
 import { importPipelineFromPython } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { Copy, Download, FileCode, Play, Plus, Square, X } from 'lucide-react';
+import { label, button, alert, panelSection } from '@/design-system';
 
 const EDITOR_OPTIONS = {
   readOnly: false,
@@ -288,8 +290,8 @@ export function PipelineCodePanel() {
 
   return (
     <div className="flex h-full flex-col border-l border-gray-200 bg-white">
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-2 py-1.5">
-        <span className="text-[11px] font-semibold text-gray-700">Pipeline code</span>
+      <div className={cn(panelSection, 'flex shrink-0 items-center justify-between')}>
+        <span className={label}>Pipeline code</span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -309,7 +311,7 @@ export function PipelineCodePanel() {
             type="button"
             onClick={handleCopy}
             disabled={!fullScript}
-            className="flex items-center gap-0.5 rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
             title={copyFeedback === 'script' ? 'Copied' : 'Copy Python script'}
           >
             <Copy size={13} />
@@ -321,7 +323,7 @@ export function PipelineCodePanel() {
             type="button"
             onClick={handleCopyJupyterCells}
             disabled={cells.length === 0}
-            className="flex items-center gap-0.5 rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
             title={copyFeedback === 'jupyter' ? 'Copied' : 'Copy as Jupyter cells'}
           >
             <FileCode size={13} />
@@ -333,7 +335,7 @@ export function PipelineCodePanel() {
             type="button"
             onClick={handleDownloadPy}
             disabled={cells.length === 0}
-            className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
             title="Download as .py"
           >
             <Download size={13} />
@@ -342,7 +344,7 @@ export function PipelineCodePanel() {
             type="button"
             onClick={handleDownloadNotebook}
             disabled={nodes.length === 0}
-            className="rounded px-1 py-1 text-[10px] font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
             title="Download as .ipynb"
           >
             .ipynb
@@ -350,7 +352,7 @@ export function PipelineCodePanel() {
           <button
             type="button"
             onClick={handleAddCell}
-            className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm)}
             title="Add new cell (run to create suggested node)"
           >
             <Plus size={13} />
@@ -359,12 +361,12 @@ export function PipelineCodePanel() {
       </div>
 
       {runError && (
-        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-red-100 bg-red-50 px-2 py-1.5 text-[11px] text-red-700">
+        <div className={cn(alert, 'flex shrink-0 items-start justify-between gap-2 border-b')}>
           <span className="min-w-0 flex-1 break-words">{runError}</span>
           <button
             type="button"
             onClick={() => setRunError(null)}
-            className="shrink-0 rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-800"
+            className={cn(button.base, button.variants.ghost, 'shrink-0 rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-800')}
             title="Dismiss"
             aria-label="Dismiss error"
           >
@@ -401,7 +403,7 @@ export function PipelineCodePanel() {
                 }`}
               >
                 <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1">
-                  <span className="text-[10px] font-medium text-gray-500">
+                  <span className={label}>
                     {cell.label} ({cell.nodeType})
                   </span>
                   <button

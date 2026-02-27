@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react';
 import { Settings } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { card, label, panelSection, panelSectionHeader, checkbox } from '@/design-system';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
@@ -41,36 +43,36 @@ export function PreferencesPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white py-2 shadow-lg"
+      className={cn(card.base, 'absolute left-0 top-full z-50 mt-1 w-64 border py-2')}
     >
-      <div className="border-b border-gray-100 px-3 pb-2">
-        <p className="text-xs font-medium text-gray-500">Settings</p>
+      <div className={panelSection}>
+        <p className={label}>Settings</p>
       </div>
-      <div className="space-y-1 px-3 py-2">
+      <div className={cn('space-y-1', panelSectionHeader)}>
         <label className="flex cursor-pointer items-center justify-between gap-2 py-1.5">
-          <span className="text-xs text-gray-700">
+          <span className={cn(label, 'normal-case font-normal text-gray-700')}>
             Show code by default in nodes
           </span>
           <input
             type="checkbox"
             checked={showCodeByDefault}
             onChange={(e) => setShowCodeByDefault(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className={checkbox}
           />
         </label>
         <div className="py-1.5">
-          <span className="block text-xs text-gray-700">
+          <span className={cn('block', label, 'normal-case font-normal text-gray-700')}>
             Default script language
           </span>
           <span className="mt-1 block text-xs font-medium text-gray-800">Python</span>
         </div>
         <label className="flex cursor-pointer items-center justify-between gap-2 py-1.5">
-          <span className="text-xs text-gray-700">Suggest next steps</span>
+          <span className={cn(label, 'normal-case font-normal text-gray-700')}>Suggest next steps</span>
           <input
             type="checkbox"
             checked={suggestNextSteps}
             onChange={(e) => setSuggestNextSteps(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className={checkbox}
           />
         </label>
       </div>

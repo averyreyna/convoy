@@ -5,8 +5,10 @@ import {
   Table, Upload, FileSpreadsheet, X, ClipboardPaste, Globe, Loader2,
   Database, FlipVertical2, MessageSquareWarning,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { button, input, spinnerLg, dropZoneDefault, dropZoneActive, tableContainer, tableHeader } from '@/design-system';
 import { useDataStore } from '@/stores/dataStore';
 import type { DataSourceNodeData, Column, DataFrame } from '@/types';
 
@@ -359,18 +361,17 @@ export function DataSourceNode({ id, data, selected }: DataSourceNodeProps) {
         /* Upload zone */
         <div className="space-y-2">
           <div
-            className={`flex flex-col items-center justify-center rounded-md border-2 border-dashed p-4 transition-colors ${
-              isDragOver
-                ? 'border-blue-400 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
+            className={cn(
+              isDragOver ? dropZoneActive : dropZoneDefault,
+              'flex flex-col items-center justify-center'
+            )}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
           >
             {isParsing ? (
               <>
-                <div className="mb-2 h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+                <div className={cn(spinnerLg, 'mb-2')} />
                 <span className="text-xs text-gray-500">Parsing data...</span>
               </>
             ) : (
@@ -402,25 +403,28 @@ export function DataSourceNode({ id, data, selected }: DataSourceNodeProps) {
           {/* Paste + URL import buttons */}
           <div className="flex gap-1.5">
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePaste();
               }}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md border border-gray-200 px-2 py-1.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700"
+              className={cn(button.base, button.variants.secondary, button.sizes.sm, 'flex-1')}
             >
               <ClipboardPaste size={10} />
               Paste data
             </button>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowUrlInput(!showUrlInput);
               }}
-              className={`flex flex-1 items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-[10px] font-medium transition-colors ${
-                showUrlInput
-                  ? 'border-blue-300 bg-blue-50 text-blue-600'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700'
-              }`}
+              className={cn(
+                button.base,
+                showUrlInput ? 'border-blue-300 bg-blue-50 text-blue-600' : button.variants.secondary,
+                button.sizes.sm,
+                'flex-1'
+              )}
             >
               <Globe size={10} />
               From URL
@@ -438,16 +442,17 @@ export function DataSourceNode({ id, data, selected }: DataSourceNodeProps) {
                   if (e.key === 'Enter') handleUrlImport();
                 }}
                 placeholder="https://example.com/data.csv"
-                className="min-w-0 flex-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+                className={cn(input.default, 'min-w-0 flex-1')}
                 onClick={(e) => e.stopPropagation()}
               />
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleUrlImport();
                 }}
                 disabled={isLoadingUrl || !urlValue.trim()}
-                className="flex items-center gap-1 rounded-md bg-blue-500 px-2 py-1 text-[10px] font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+                className={cn(button.base, button.variants.primary, button.sizes.sm, 'disabled:opacity-50')}
               >
                 {isLoadingUrl ? <Loader2 size={10} className="animate-spin" /> : 'Load'}
               </button>
@@ -548,14 +553,14 @@ export function DataSourceNode({ id, data, selected }: DataSourceNodeProps) {
 
           {/* Mini preview table */}
           {previewRows.length > 0 && displayColumns.length > 0 && (
-            <div className="max-h-36 overflow-auto rounded border border-gray-100 text-[10px]">
+            <div className={cn(tableContainer, 'max-h-36')}>
               <table className="w-full">
-                <thead className="sticky top-0 bg-gray-50">
+                <thead className="sticky top-0">
                   <tr>
                     {displayColumns.map((col) => (
                       <th
                         key={col.name}
-                        className="whitespace-nowrap px-2 py-1 text-left font-medium text-gray-500"
+                        className={cn(tableHeader, 'whitespace-nowrap text-left')}
                       >
                         {col.name}
                       </th>

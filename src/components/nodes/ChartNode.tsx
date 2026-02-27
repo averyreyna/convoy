@@ -5,6 +5,7 @@ import { BaseNode } from './BaseNode';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useUpstreamData } from '@/hooks/useUpstreamData';
 import { cn } from '@/lib/utils';
+import { label, button, input, caption, alertWarning } from '@/design-system';
 import { ChartPreviewModal } from './ChartPreviewModal';
 import { D3Chart } from '@/components/charts/D3Chart';
 import type { ChartNodeData } from '@/types';
@@ -68,9 +69,7 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
           <div className="flex items-end gap-2">
             {/* Chart type selector */}
             <div className="shrink-0">
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-                Chart type
-              </label>
+              <label className={label}>Chart type</label>
               <div className="flex gap-0.5">
                 {CHART_TYPES.map((type) => (
                   <button
@@ -80,10 +79,11 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
                       updateNode(id, { chartType: type });
                     }}
                     className={cn(
-                      'rounded-md px-2 py-1 text-[10px] font-medium capitalize transition-colors',
+                      button.base,
+                      button.sizes.sm,
                       data.chartType === type
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? button.variants.primary
+                        : button.variants.secondary
                     )}
                   >
                     {type}
@@ -94,15 +94,13 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
 
             {/* X Axis */}
             <div className="min-w-0 flex-1">
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-                X Axis
-              </label>
+              <label className={label}>X Axis</label>
               <select
                 value={data.xAxis || ''}
                 onChange={(e) =>
                   updateNode(id, { xAxis: e.target.value })
                 }
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 outline-none focus:border-blue-300"
+                className={input.default}
               >
                 <option value="">Select...</option>
                 {columns.map((col) => (
@@ -115,15 +113,13 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
 
             {/* Y Axis */}
             <div className="min-w-0 flex-1">
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-                Y Axis
-              </label>
+              <label className={label}>Y Axis</label>
               <select
                 value={data.yAxis || ''}
                 onChange={(e) =>
                   updateNode(id, { yAxis: e.target.value })
                 }
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 outline-none focus:border-blue-300"
+                className={input.default}
               >
                 <option value="">Select...</option>
                 {columns.map((col) => (
@@ -136,9 +132,7 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
 
             {/* Color-by column */}
             <div className="min-w-0 flex-1">
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-400">
-                Color by
-              </label>
+              <label className={label}>Color by</label>
               <select
                 value={data.colorBy || ''}
                 onChange={(e) =>
@@ -146,7 +140,7 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
                     colorBy: e.target.value || undefined,
                   })
                 }
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 outline-none focus:border-blue-300"
+                className={input.default}
               >
                 <option value="">None</option>
                 {columns.map((col) => (
@@ -178,7 +172,7 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
             ) : (
               <div className="flex h-[280px] flex-col items-center justify-center text-gray-300">
                 <BarChart3 size={32} />
-                <span className="mt-2 text-xs">Configure chart axes to preview</span>
+                <span className={cn('mt-2', caption)}>Configure chart axes to preview</span>
               </div>
             )}
 
@@ -198,7 +192,7 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
 
             {/* Data summary inside chart container */}
             {hasChart && (
-              <div className="border-t border-gray-50 py-1 text-center text-[10px] text-gray-400">
+              <div className={cn('border-t border-gray-50 py-1 text-center', caption)}>
                 {chartData.length.toLocaleString()} data points
               </div>
             )}
@@ -206,7 +200,7 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
 
           {/* No upstream data warning */}
           {!upstreamData && data.state === 'confirmed' && (
-            <div className="rounded-md bg-amber-50 px-2 py-1 text-[10px] text-amber-600">
+            <div className={cn(alertWarning, '!mb-0')}>
               Connect a data source to populate columns
             </div>
           )}

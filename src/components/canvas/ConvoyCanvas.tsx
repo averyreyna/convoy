@@ -8,9 +8,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { nodeTypes } from '@/components/nodes';
 import { edgeTypes } from '@/components/edges';
+import { pageBackground } from '@/design-system';
 import { CanvasControls } from './CanvasControls';
 import { PipelinePrompt } from './PipelinePrompt';
 import { ImportFromPythonModal } from './ImportFromPythonModal';
@@ -51,7 +53,7 @@ export function ConvoyCanvas() {
           animated: true,
         }}
         proOptions={{ hideAttribution: true }}
-        className="bg-gray-50"
+        className={cn(pageBackground)}
         snapToGrid
         snapGrid={[16, 16]}
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}

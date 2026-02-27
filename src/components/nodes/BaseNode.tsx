@@ -5,6 +5,19 @@ import { diffLines, type Change } from 'diff';
 import { ChevronDown, ChevronRight, GitCompare, Square, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
+import {
+  card,
+  nodeHeader,
+  nodeHeaderTitle,
+  nodeHandle,
+  button,
+  badge,
+  alert,
+  caption,
+  panelSection,
+  panelSectionHeader,
+  divider,
+} from '@/design-system';
 import { ExplanationPopover } from './ExplanationPopover';
 
 export type NodeState = 'proposed' | 'confirmed' | 'running' | 'error';
@@ -92,15 +105,11 @@ export const BaseNode = memo(function BaseNode({
   return (
     <div
       className={cn(
-        'group relative rounded-lg border-2 bg-white shadow-md transition-all hover:shadow-lg',
-        wide ? 'min-w-[520px] max-w-[580px]' : 'min-w-[300px] max-w-[340px]',
-        {
-          'border-dashed border-gray-300 opacity-60': state === 'proposed',
-          'border-solid border-gray-200': state === 'confirmed',
-          'border-solid border-red-400 shadow-red-100': state === 'error',
-          'animate-pulse border-blue-400 shadow-blue-100': state === 'running',
-          'border-2 border-dotted border-blue-200 bg-blue-50/50': selected,
-        }
+        'group relative',
+        card.base,
+        card.stateVariants[state],
+        selected && card.selected,
+        wide && card.wide
       )}
     >
       {/* Input handle */}
@@ -108,12 +117,12 @@ export const BaseNode = memo(function BaseNode({
         <Handle
           type="target"
           position={Position.Left}
-          className="!h-3 !w-3 !rounded-full !border-2 !border-white !bg-blue-500"
+          className={nodeHandle}
         />
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
+      <div className={nodeHeader}>
         {nodeId != null ? (
           <button
             type="button"
@@ -140,7 +149,7 @@ export const BaseNode = memo(function BaseNode({
             <Square size={18} />
           </span>
         )}
-        <span className="text-sm font-medium text-gray-800">{title}</span>
+        <span className={nodeHeaderTitle}>{title}</span>
         <div className="ml-auto flex items-center gap-1">
           {showExplanation && (
             <ExplanationPopover
@@ -151,14 +160,10 @@ export const BaseNode = memo(function BaseNode({
             />
           )}
           {state === 'proposed' && (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">
-              Proposed
-            </span>
+            <span className={cn(badge.base, badge.variants.proposed)}>Proposed</span>
           )}
           {state === 'error' && (
-            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600">
-              Error
-            </span>
+            <span className={cn(badge.base, badge.variants.error)}>Error</span>
           )}
         </div>
       </div>
@@ -166,22 +171,20 @@ export const BaseNode = memo(function BaseNode({
       {/* Content: config/simple view only; code editing is in the pipeline code view */}
       <div className="p-3">
         {state === 'error' && errorMessage && (
-          <div className="mb-2 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700">
-            {errorMessage}
-          </div>
+          <div className={alert}>{errorMessage}</div>
         )}
         {children}
       </div>
 
       {/* Confirm button for proposed nodes */}
       {state === 'proposed' && onConfirm && (
-        <div className="border-t border-gray-100 px-3 py-2">
+        <div className={cn(divider, panelSectionHeader)}>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onConfirm();
             }}
-            className="w-full rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-600 active:bg-blue-700"
+            className={cn(button.base, button.variants.primary, button.sizes.md, button.fullWidth)}
           >
             Click to confirm
           </button>
@@ -190,14 +193,14 @@ export const BaseNode = memo(function BaseNode({
 
       {/* Inline diff: compact strip when baseline exists and differs */}
       {hasInlineDiff && (
-        <div className="border-t border-gray-100 bg-gray-50/80">
+        <div className={cn(divider, panelSectionHeader, 'bg-gray-50/80')}>
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setDiffExpanded((x) => !x);
             }}
-            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[10px] font-medium text-gray-600 hover:bg-gray-100"
+            className={cn(button.base, button.variants.ghost, button.sizes.sm, 'w-full justify-start text-left')}
           >
             {diffExpanded ? (
               <ChevronDown size={12} />
@@ -214,10 +217,10 @@ export const BaseNode = memo(function BaseNode({
             </span>
           </button>
           {diffExpanded && (
-            <div className="max-h-32 overflow-auto border-t border-gray-100 px-3 py-2 font-mono text-[10px]">
+            <div className={cn(divider, panelSectionHeader, 'max-h-32 overflow-auto font-mono text-[10px]')}>
               {configChanged && (
                 <div className="mb-2">
-                  <div className="mb-0.5 text-gray-500">Config</div>
+                  <div className={cn('mb-0.5', caption)}>Config</div>
                   <div className="rounded bg-red-50 px-1.5 py-0.5 text-red-800 line-through">
                     {JSON.stringify(baseline.config)}
                   </div>
@@ -228,7 +231,7 @@ export const BaseNode = memo(function BaseNode({
               )}
               {codeChanged && codeDiffLines && (
                 <div>
-                  <div className="mb-0.5 text-gray-500">Code</div>
+                  <div className={cn('mb-0.5', caption)}>Code</div>
                   <div className="space-y-0.5">
                     {codeDiffLines.flatMap((change, i) => {
                       const lines = change.value.split('\n');
@@ -272,7 +275,7 @@ export const BaseNode = memo(function BaseNode({
         <Handle
           type="source"
           position={Position.Right}
-          className="!h-3 !w-3 !rounded-full !border-2 !border-white !bg-blue-500"
+          className={nodeHandle}
         />
       )}
     </div>

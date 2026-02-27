@@ -1,10 +1,13 @@
+import { cn } from '@/lib/utils';
+import { headingLg, captionMuted, panelSectionHeader } from '@/design-system';
+
 export function SidebarHeader() {
   return (
-    <div className="relative shrink-0 px-4 py-3">
+    <div className={cn('relative shrink-0', panelSectionHeader)}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800">Convoy</h2>
-          <p className="mt-0.5 text-xs text-gray-400">
+          <h2 className={headingLg}>Convoy</h2>
+          <p className={cn('mt-0.5', captionMuted)}>
             Click a node type to add it to the canvas
           </p>
         </div>

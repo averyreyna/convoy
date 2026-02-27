@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { Code2, Settings2, RotateCcw, CheckCircle2, AlertCircle, Circle, ClipboardPaste, Pencil, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { segmentControl, segmentControlItem, segmentControlItemSelected } from '@/design-system';
 import { generateNodeCode, getEditorLanguage } from '@/lib/codeGenerators';
 import { validateSyntax } from '@/lib/codeValidation';
 import type { editor as monacoEditor } from 'monaco-editor';
@@ -428,7 +429,7 @@ export function CodeView({
   return (
     <div className="space-y-2">
       {/* Simple / Code toggle */}
-      <div className="flex rounded-md border border-gray-200 bg-gray-50 p-0.5">
+      <div className={segmentControl}>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -436,12 +437,10 @@ export function CodeView({
           }}
           disabled={hasEdited}
           className={cn(
-            'flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors',
-            !isCodeMode
-              ? 'bg-white text-gray-700 shadow-sm'
-              : hasEdited
-                ? 'cursor-not-allowed text-gray-300'
-                : 'text-gray-500 hover:text-gray-700'
+            segmentControlItem,
+            'flex flex-1 items-center justify-center gap-1',
+            !isCodeMode && segmentControlItemSelected,
+            hasEdited && 'cursor-not-allowed text-gray-300'
           )}
         >
           <Settings2 size={12} />
@@ -453,10 +452,9 @@ export function CodeView({
             if (!isCodeMode) onToggleMode();
           }}
           className={cn(
-            'flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors',
-            isCodeMode
-              ? 'bg-white text-gray-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+            segmentControlItem,
+            'flex flex-1 items-center justify-center gap-1',
+            isCodeMode && segmentControlItemSelected
           )}
         >
           <Code2 size={12} />
