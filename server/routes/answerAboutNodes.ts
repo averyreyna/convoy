@@ -7,7 +7,7 @@ import type {
 
 const router = express.Router();
 
-const ANSWER_ABOUT_NODES_SYSTEM_PROMPT = `You are a data pipeline advisor. The user has connected one or more nodes on the canvas and asked a question about them. Answer in plain language: give advice, next steps, or feedback. Do not suggest code or node edits unless the user explicitly asks. Be concise but helpful. You may use markdown for structure (headings, lists, code snippets) if it helps.`;
+const ANSWER_ABOUT_NODES_SYSTEM_PROMPT = `You are a data pipeline advisor. The user has connected one or more nodes on the canvas and asked a question about them. Answer in plain language: give advice, next steps, or feedback. Do not suggest code or node edits unless the user explicitly asks. Be concise but helpful. Prefer a simple, conversational explanation that reads like normal text. You may use light markdown for structure (short headings or bullets) if it truly helps clarity, but avoid heavy formatting or long, sectioned documents.`;
 
 interface AnswerAboutNodesRequestBody {
   nodeIds?: string[];

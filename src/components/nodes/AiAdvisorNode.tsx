@@ -168,7 +168,7 @@ export function AiAdvisorNode({ id, data, selected }: AiAdvisorNodeProps) {
                 </div>
                 <div
                   className={cn(
-                    'max-h-48 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2.5 text-sm text-gray-800',
+                    'max-h-48 overflow-y-auto text-sm text-gray-800 leading-relaxed',
                     'whitespace-pre-wrap'
                   )}
                 >
