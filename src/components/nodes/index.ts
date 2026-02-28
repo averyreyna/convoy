@@ -1,40 +1,39 @@
+import type { ComponentType } from 'react';
 import type { NodeTypes } from '@xyflow/react';
-import type { NodeTypeInfo } from '@/types';
-import { DataSourceNode } from './DataSourceNode';
-import { FilterNode } from './FilterNode';
-import { GroupByNode } from './GroupByNode';
-import { SortNode } from './SortNode';
-import { SelectNode } from './SelectNode';
-import { TransformNode } from './TransformNode';
-import { ChartNode } from './ChartNode';
-import { ComputedColumnNode } from './ComputedColumnNode';
-import { ReshapeNode } from './ReshapeNode';
-import { AiQueryNode } from './AiQueryNode';
-import { AiAdvisorNode } from './AiAdvisorNode';
+import type { NodeType, NodeTypeInfo, NodeTypeToData } from '@/types';
+import { DataSourceNode } from './data/DataSourceNode';
+import { FilterNode } from './data/FilterNode';
+import { GroupByNode } from './data/GroupByNode';
+import { SortNode } from './data/SortNode';
+import { SelectNode } from './data/SelectNode';
+import { TransformNode } from './data/TransformNode';
+import { ChartNode } from './data/ChartNode';
+import { ComputedColumnNode } from './data/ComputedColumnNode';
+import { ReshapeNode } from './data/ReshapeNode';
+import { AiQueryNode } from './ai/AiQueryNode';
+import { AiAdvisorNode } from './ai/AiAdvisorNode';
+import { AiCallButton } from './ai/AiCallButton';
+import { AiErrorAlert } from './ai/AiErrorAlert';
+import { AiSuggestionList } from './ai/AiSuggestionList';
+import { NodeCodePreview } from './core/NodeCodePreview';
 
-/**
- * Registry of all custom node types for React Flow.
- */
-export const nodeTypes: NodeTypes = {
-  dataSource: DataSourceNode,
-  filter: FilterNode,
-  groupBy: GroupByNode,
-  sort: SortNode,
-  select: SelectNode,
-  transform: TransformNode,
-  chart: ChartNode,
-  computedColumn: ComputedColumnNode,
-  reshape: ReshapeNode,
-  aiQuery: AiQueryNode,
-  aiAdvisor: AiAdvisorNode,
-};
+type NodeComponent = ComponentType<any>;
 
-/**
- * Node type metadata used by the NodePalette sidebar.
- */
-export const nodeTypeInfos: NodeTypeInfo[] = [
-  {
+interface NodeDef<TType extends NodeType> {
+  type: TType;
+  component: NodeComponent;
+  label: string;
+  description: string;
+  icon: string;
+  defaultData: Partial<NodeTypeToData[TType]>;
+  inputs: number;
+  outputs: number;
+}
+
+export const NODE_DEFS: Record<NodeType, NodeDef<NodeType>> = {
+  dataSource: {
     type: 'dataSource',
+    component: DataSourceNode,
     label: 'Data Source',
     description: 'Load data from CSV or JSON',
     icon: 'table',
@@ -42,8 +41,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 0,
     outputs: 1,
   },
-  {
+  filter: {
     type: 'filter',
+    component: FilterNode,
     label: 'Filter',
     description: 'Filter rows by condition',
     icon: 'filter',
@@ -51,8 +51,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 1,
   },
-  {
+  groupBy: {
     type: 'groupBy',
+    component: GroupByNode,
     label: 'Group By',
     description: 'Aggregate data by column',
     icon: 'layers',
@@ -60,8 +61,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 1,
   },
-  {
+  sort: {
     type: 'sort',
+    component: SortNode,
     label: 'Sort',
     description: 'Sort by column',
     icon: 'arrowUpDown',
@@ -69,8 +71,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 1,
   },
-  {
+  select: {
     type: 'select',
+    component: SelectNode,
     label: 'Select',
     description: 'Choose specific columns',
     icon: 'columns3',
@@ -78,8 +81,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 1,
   },
-  {
+  transform: {
     type: 'transform',
+    component: TransformNode,
     label: 'Transform',
     description: 'Custom code transformation',
     icon: 'code2',
@@ -87,8 +91,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 1,
   },
-  {
+  computedColumn: {
     type: 'computedColumn',
+    component: ComputedColumnNode,
     label: 'Computed Column',
     description: 'Add a derived column',
     icon: 'calculator',
@@ -96,8 +101,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 1,
   },
-  {
+  reshape: {
     type: 'reshape',
+    component: ReshapeNode,
     label: 'Reshape',
     description: 'Unpivot wide → long data',
     icon: 'flipVertical2',
@@ -105,8 +111,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 1,
   },
-  {
+  chart: {
     type: 'chart',
+    component: ChartNode,
     label: 'Chart',
     description: 'Render visualization',
     icon: 'barChart3',
@@ -114,8 +121,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 0,
   },
-  {
+  aiQuery: {
     type: 'aiQuery',
+    component: AiQueryNode,
     label: 'Query with AI',
     description: 'Describe changes in natural language; connect nodes as context',
     icon: 'sparkles',
@@ -123,8 +131,9 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 0,
   },
-  {
+  aiAdvisor: {
     type: 'aiAdvisor',
+    component: AiAdvisorNode,
     label: 'Ask about nodes',
     description: 'Connect nodes and ask a question; get advice or next steps',
     icon: 'messageCircle',
@@ -132,4 +141,22 @@ export const nodeTypeInfos: NodeTypeInfo[] = [
     inputs: 1,
     outputs: 0,
   },
-];
+};
+
+export const nodeTypes: NodeTypes = Object.fromEntries(
+  Object.entries(NODE_DEFS).map(([type, def]) => [type, def.component])
+);
+
+export const nodeTypeInfos: NodeTypeInfo[] = Object.values(NODE_DEFS).map(
+  ({ type, label, description, icon, defaultData, inputs, outputs }) => ({
+    type,
+    label,
+    description,
+    icon,
+    defaultData,
+    inputs,
+    outputs,
+  })
+);
+
+export { AiCallButton, AiErrorAlert, AiSuggestionList, NodeCodePreview };
