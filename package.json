@@ -17,10 +17,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
     "@monaco-editor/react": "^4.7.0",
-    "@types/d3": "^7.4.3",
     "@xyflow/react": "^12.6.0",
     "cors": "^2.8.6",
-    "d3": "^7.9.0",
     "diff": "^8.0.3",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",

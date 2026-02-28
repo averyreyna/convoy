@@ -1,7 +1,8 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { X, Download, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { D3Chart } from '@/components/charts/D3Chart';
+import { useChartImage } from '@/hooks/useChartImage';
+import { renderChart } from '@/lib/api';
 import type { Column } from '@/types';
 import {
   modalOverlay,
@@ -33,53 +34,52 @@ export function ChartPreviewModal({
   data,
 }: ChartPreviewModalProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [isExportingSvg, setIsExportingSvg] = useState(false);
+
+  const { image, isLoading, error } = useChartImage({
+    chartType,
+    xAxis,
+    yAxis,
+    colorBy,
+    data,
+    width: 800,
+    height: 500,
+    format: 'png',
+  });
 
   const handleExportPNG = useCallback(() => {
-    const container = chartContainerRef.current;
-    if (!container) return;
-
-    const svg = container.querySelector('svg');
-    if (!svg) return;
-
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const img = new window.Image();
-    img.onload = () => {
-      canvas.width = img.width * 2;
-      canvas.height = img.height * 2;
-      ctx.scale(2, 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
-
-      const link = document.createElement('a');
-      link.download = `chart-${chartType}-${Date.now()}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    };
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
-  }, [chartType]);
-
-  const handleExportSVG = useCallback(() => {
-    const container = chartContainerRef.current;
-    if (!container) return;
-
-    const svg = container.querySelector('svg');
-    if (!svg) return;
-
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const blob = new Blob([svgData], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-
+    if (!image || !image.startsWith('data:image/png')) return;
     const link = document.createElement('a');
-    link.download = `chart-${chartType}-${Date.now()}.svg`;
-    link.href = url;
+    link.download = `chart-${chartType}-${Date.now()}.png`;
+    link.href = image;
     link.click();
-    URL.revokeObjectURL(url);
-  }, [chartType]);
+  }, [chartType, image]);
+
+  const handleExportSVG = useCallback(async () => {
+    if (!xAxis || !yAxis || data.length === 0) return;
+    setIsExportingSvg(true);
+    try {
+      const { image: svgImage } = await renderChart({
+        chartType,
+        xAxis,
+        yAxis,
+        colorBy,
+        data,
+        width: 800,
+        height: 500,
+        format: 'svg',
+      });
+      const blob = new Blob([svgImage], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `chart-${chartType}-${Date.now()}.svg`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExportingSvg(false);
+    }
+  }, [chartType, xAxis, yAxis, colorBy, data]);
 
   if (!isOpen) return null;
 
@@ -112,6 +112,7 @@ export function ChartPreviewModal({
             <button
               type="button"
               onClick={handleExportPNG}
+              disabled={!image || !image.startsWith('data:image/png')}
               className={cn(button.base, button.variants.secondary, button.sizes.md)}
               title="Export as PNG"
             >
@@ -120,12 +121,13 @@ export function ChartPreviewModal({
             </button>
             <button
               type="button"
-              onClick={handleExportSVG}
+              onClick={() => handleExportSVG()}
+              disabled={!hasData || isExportingSvg}
               className={cn(button.base, button.variants.secondary, button.sizes.md)}
               title="Export as SVG"
             >
               <Download size={14} />
-              SVG
+              {isExportingSvg ? '…' : 'SVG'}
             </button>
             <button
               type="button"
@@ -141,14 +143,32 @@ export function ChartPreviewModal({
         {/* Chart */}
         <div ref={chartContainerRef} className="h-[calc(100%-72px)] p-6">
           {hasData ? (
-            <D3Chart
-              chartType={chartType}
-              data={data}
-              xAxis={xAxis}
-              yAxis={yAxis}
-              colorBy={colorBy}
-              responsive
-            />
+            <div className="flex h-full w-full flex-col items-center justify-center">
+              {isLoading && (
+                <div className="flex items-center justify-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+                </div>
+              )}
+              {error && (
+                <div className="max-w-md p-4 text-center text-sm text-amber-700">
+                  <p className="font-medium">Chart preview unavailable</p>
+                  <p className="mt-1 text-xs">
+                    Ensure the server is running with Python and matplotlib.
+                  </p>
+                </div>
+              )}
+              {image && !error && (
+                <img
+                  src={
+                    image.startsWith('data:')
+                      ? image
+                      : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(image)}`
+                  }
+                  alt="Chart"
+                  className="max-h-full max-w-full object-contain"
+                />
+              )}
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center text-gray-400">
               No data to display
