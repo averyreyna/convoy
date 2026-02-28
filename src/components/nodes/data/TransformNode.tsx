@@ -1,0 +1,93 @@
+import { useMemo } from 'react';
+import { type NodeProps } from '@xyflow/react';
+import { Code2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { BaseNode } from '../core/BaseNode';
+import { useCanvasStore } from '@/stores/canvasStore';
+import { useDataStore } from '@/stores/dataStore';
+import { useNodeExecution } from '@/hooks/useNodeExecution';
+import { DataPreview } from '../core/DataPreview';
+import { caption, alertWarning, mutedBox, mutedBoxRow } from '@/flank';
+import type { TransformNodeData } from '@/types';
+
+type TransformNodeProps = NodeProps & {
+  data: TransformNodeData;
+};
+
+const DEFAULT_TRANSFORM_CODE = `// The input data is available as 'rows' (array of objects)
+// and 'columns' (array of {name, type}).
+// Return { columns, rows } with your transformed data.
+
+// Example: add a calculated column
+// const newCols = [...columns, { name: "newCol", type: "number" }];
+// const newRows = rows.map(row => ({ ...row, newCol: Number(row.colA) + Number(row.colB) }));
+// return { columns: newCols, rows: newRows };
+
+return { columns, rows };`;
+
+export function TransformNode({ id, data, selected }: TransformNodeProps) {
+  const confirmNode = useCanvasStore((s) => s.confirmNode);
+  const updateNode = useCanvasStore((s) => s.updateNode);
+
+  const code = data.customCode || DEFAULT_TRANSFORM_CODE;
+
+  // Config used for execution
+  const config = useMemo(
+    () => ({
+      customCode: code,
+    }),
+    [code]
+  );
+
+  // Execute the node
+  const { upstreamData } = useNodeExecution(
+    id,
+    'transform',
+    config,
+    data.state === 'confirmed'
+  );
+
+  const nodeOutput = useDataStore((s) => s.nodeOutputs[id]);
+
+  return (
+    <BaseNode
+      nodeId={id}
+      state={data.state}
+      title="Transform"
+      icon={<Code2 size={16} />}
+      selected={selected}
+      inputs={1}
+      outputs={1}
+      onConfirm={() => confirmNode(id)}
+      nodeType="transform"
+      nodeConfig={config}
+      inputRowCount={data.inputRowCount}
+      outputRowCount={data.outputRowCount}
+      customCode={code}
+      errorMessage={data.error}
+    >
+      <div className="space-y-2">
+        <p className={caption}>
+          Edit code in the pipeline view (right panel).
+        </p>
+        {data.inputRowCount !== undefined && (
+          <div className={cn(mutedBox, mutedBoxRow, caption)}>
+            <span>{data.inputRowCount.toLocaleString()} rows in</span>
+            <span className="text-gray-300">&rarr;</span>
+            <span className="font-medium text-gray-700">
+              {data.outputRowCount?.toLocaleString() ?? '?'} rows out
+            </span>
+          </div>
+        )}
+        {!upstreamData && data.state === 'confirmed' && (
+          <div className={cn(alertWarning, '!mb-0')}>
+            Connect a data source to process data
+          </div>
+        )}
+
+        {/* Output data preview */}
+        <DataPreview data={nodeOutput} />
+      </div>
+    </BaseNode>
+  );
+}

@@ -75,6 +75,16 @@ export interface ReshapeNodeData extends BaseNodeData {
   outputRowCount?: number;
 }
 
+export interface TransformNodeData extends BaseNodeData {
+  customCode?: string;
+  inputRowCount?: number;
+  outputRowCount?: number;
+}
+
+export interface AiQueryNodeData extends BaseNodeData {
+  query?: string;
+}
+
 export interface AiAdvisorNodeData extends BaseNodeData {
   question?: string;
   answer?: string;
@@ -89,7 +99,25 @@ export type ConvoyNodeData =
   | ChartNodeData
   | ComputedColumnNodeData
   | ReshapeNodeData
+  | TransformNodeData
+  | AiQueryNodeData
   | AiAdvisorNodeData;
+
+export interface NodeTypeToData {
+  dataSource: DataSourceNodeData;
+  filter: FilterNodeData;
+  groupBy: GroupByNodeData;
+  sort: SortNodeData;
+  select: SelectNodeData;
+  transform: TransformNodeData;
+  chart: ChartNodeData;
+  computedColumn: ComputedColumnNodeData;
+  reshape: ReshapeNodeData;
+  aiQuery: AiQueryNodeData;
+  aiAdvisor: AiAdvisorNodeData;
+}
+
+export type NodeType = keyof NodeTypeToData;
 
 export interface ProposedPipeline {
   nodes: Array<{

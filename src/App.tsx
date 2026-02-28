@@ -3,11 +3,8 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { ChevronLeft, ChevronRight, Code2, Globe, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
-import { ConvoyCanvas } from '@/components/canvas/ConvoyCanvas';
-import { NodePalette } from '@/components/canvas/NodePalette';
-import { SidebarHeader } from '@/components/canvas/SidebarHeader';
-import { PipelineCodePanel } from '@/components/canvas/PipelineCodePanel';
-import { pageBackground } from '@/design-system';
+import { ConvoyCanvas, NodePalette, SidebarHeader, PipelineCodePanel } from '@/components/canvas';
+import { pageBackground } from '@/flank';
 
 const MIN_CODE_PCT = 25;
 const MAX_CODE_PCT = 50;
