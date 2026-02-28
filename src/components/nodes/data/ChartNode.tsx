@@ -24,8 +24,8 @@ interface ChartConfigPanelProps {
 
 interface ChartPreviewAreaProps {
   data: ChartNodeData;
-  chartData: unknown[];
-  previewData: unknown[];
+  chartData: Record<string, unknown>[];
+  previewData: Record<string, unknown>[];
   hasChart: boolean;
   onOpenPreview: () => void;
 }
