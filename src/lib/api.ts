@@ -216,3 +216,45 @@ export async function answerAboutNodes(params: {
   const data: AnswerAboutNodesResponse = await response.json();
   return data;
 }
+
+/**
+ * Render a chart on the backend with Python/matplotlib.
+ * Returns base64 data URL (PNG) or raw SVG string.
+ */
+export async function renderChart(params: {
+  chartType: string;
+  xAxis: string;
+  yAxis: string;
+  colorBy?: string;
+  data: Record<string, unknown>[];
+  width?: number;
+  height?: number;
+  format?: 'png' | 'svg';
+}): Promise<{ image: string }> {
+  const url = `${API_BASE || ''}/api/render-chart`.replace(/\/+/, '/');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chartType: params.chartType,
+      xAxis: params.xAxis,
+      yAxis: params.yAxis,
+      colorBy: params.colorBy,
+      data: params.data,
+      width: params.width,
+      height: params.height,
+      format: params.format ?? 'png',
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error((error as { error?: string }).error || `Chart render failed (${response.status})`);
+  }
+
+  const data = (await response.json()) as { image: string };
+  if (typeof data.image !== 'string') {
+    throw new Error('Invalid chart response: missing image');
+  }
+  return data;
+}

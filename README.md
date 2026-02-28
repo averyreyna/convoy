@@ -12,6 +12,13 @@ Before you begin, ensure you have the following installed:
 
 - Node.js (v18 or later)
 - npm (v9 or later)
+- **Chart preview (optional):** Python 3 with matplotlib. In-app chart preview is rendered by the backend; without Python/matplotlib the chart area will show an error. Install with:
+
+  ```bash
+  pip install -r server/scripts/requirements.txt
+  ```
+
+  There is no client-side fallback for charts.
 
 ## Local Development
 

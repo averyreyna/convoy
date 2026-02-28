@@ -7,7 +7,7 @@ import { useUpstreamData } from '@/hooks/useUpstreamData';
 import { cn } from '@/lib/utils';
 import { label, button, input, caption, alertWarning } from '@/flank';
 import { ChartPreviewModal } from '../core/ChartPreviewModal';
-import { D3Chart } from '@/components/charts/D3Chart';
+import { useChartImage } from '@/hooks/useChartImage';
 import type { ChartNodeData } from '@/types';
 
 const CHART_TYPES = ['bar', 'line', 'area', 'scatter', 'pie'] as const;
@@ -117,6 +117,16 @@ function ChartPreviewArea({
   hasChart,
   onOpenPreview,
 }: ChartPreviewAreaProps) {
+  const { image, isLoading, error } = useChartImage({
+    chartType: data.chartType || 'bar',
+    xAxis: data.xAxis || '',
+    yAxis: data.yAxis || '',
+    colorBy: data.colorBy,
+    data: previewData,
+    width: 640,
+    height: 280,
+  });
+
   return (
     <div
       className={cn(
@@ -126,14 +136,30 @@ function ChartPreviewArea({
       onDoubleClick={onOpenPreview}
     >
       {hasChart ? (
-        <D3Chart
-          chartType={data.chartType || 'bar'}
-          data={previewData}
-          xAxis={data.xAxis!}
-          yAxis={data.yAxis!}
-          colorBy={data.colorBy}
-          height={280}
-        />
+        <div className="relative h-[280px] w-full">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50/80">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+            </div>
+          )}
+          {error && (
+            <div className="flex h-full flex-col items-center justify-center p-4 text-center text-sm text-amber-700">
+              <p className="font-medium">Chart preview unavailable</p>
+              <p className="mt-1 text-xs">Ensure the server is running with Python and matplotlib.</p>
+            </div>
+          )}
+          {image && !error && (
+            <img
+              src={
+                image.startsWith('data:')
+                  ? image
+                  : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(image)}`
+              }
+              alt="Chart"
+              className="h-full w-full object-contain"
+            />
+          )}
+        </div>
       ) : (
         <div className="flex h-[280px] flex-col items-center justify-center text-gray-300">
           <BarChart3 size={32} />

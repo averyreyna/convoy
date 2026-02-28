@@ -8,6 +8,7 @@ import dataRouter from './routes/data.ts';
 import healthRouter from './routes/health.ts';
 import editNodesRouter from './routes/editNodes.ts';
 import answerAboutNodesRouter from './routes/answerAboutNodes.ts';
+import chartRouter from './routes/chart.ts';
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/api', answerAboutNodesRouter);
 app.use('/api', explainRouter);
 app.use('/api', dataRouter);
 app.use('/api', healthRouter);
+app.use('/api', chartRouter);
 app.use('/api/import-from-python', importPythonRouter);
 
 app.listen(PORT, (err?: Error) => {
