@@ -44,7 +44,8 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
     id,
     'transform',
     config,
-    data.state === 'confirmed'
+    data.state === 'confirmed',
+    code
   );
 
   const nodeOutput = useDataStore((s) => s.nodeOutputs[id]);

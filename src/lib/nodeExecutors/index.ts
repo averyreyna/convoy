@@ -40,5 +40,14 @@ export async function executeNode(
       ? customCode
       : generateNodeCode(nodeType, config);
 
+  if (nodeType === 'transform') {
+    console.log('[Convoy executeNode] transform', {
+      inputRows: input.rows.length,
+      inputCols: input.columns.map((c) => c.name),
+      usedCustomCode: !!(customCode && customCode.trim() !== ''),
+      codePreview: (code || '').slice(0, 200),
+    });
+  }
+
   return runPythonWithDataFrame(input, code);
 }

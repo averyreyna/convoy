@@ -99,6 +99,16 @@ export function useNodeExecution(
 
     // When config is incomplete, pass through upstream data and clear error (no Python run)
     if (!isConfigComplete(nodeType, config, customCode)) {
+      if (nodeType === 'transform') {
+        console.log('[Convoy useNodeExecution] transform skipped: config incomplete', {
+          nodeId,
+          hasUpstreamData: !!upstreamData,
+          isConfirmed,
+          customCodeArg: customCode === undefined ? 'undefined' : `"${String(customCode).slice(0, 80)}..."`,
+          configKeys: Object.keys(config),
+          configCustomCode: config.customCode === undefined ? 'undefined' : typeof config.customCode,
+        });
+      }
       setNodeOutput(nodeId, upstreamData);
       updateNode(nodeId, {
         inputRowCount: upstreamData.rows.length,
@@ -121,6 +131,15 @@ export function useNodeExecution(
     if (execKey === lastExecKey.current) return;
     lastExecKey.current = execKey;
 
+    if (nodeType === 'transform') {
+      console.log('[Convoy useNodeExecution] transform executing', {
+        nodeId,
+        inputRows: upstreamData.rows.length,
+        customCodeArg: customCode === undefined ? 'undefined' : `"${String(customCode).slice(0, 120)}..."`,
+        configCustomCode: config.customCode === undefined ? 'undefined' : `"${String(config.customCode).slice(0, 120)}..."`,
+      });
+    }
+
     try {
       const result: DataFrame = await executeNode(
         nodeType,
@@ -128,6 +147,10 @@ export function useNodeExecution(
         config,
         customCode
       );
+
+      if (nodeType === 'transform') {
+        console.log('[Convoy useNodeExecution] transform success', { nodeId, outputRows: result.rows.length });
+      }
 
       // Store the output for downstream nodes
       setNodeOutput(nodeId, result);
@@ -141,6 +164,9 @@ export function useNodeExecution(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Execution failed';
+      if (nodeType === 'transform') {
+        console.log('[Convoy useNodeExecution] transform error', { nodeId, error: message });
+      }
       updateNode(nodeId, {
         state: 'error',
         error: message,
