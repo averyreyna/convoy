@@ -41,7 +41,7 @@ export function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
   return sorted.map((id) => nodeMap.get(id)!).filter(Boolean);
 }
 
-const META_NODE_TYPES = ['aiQuery', 'aiAdvisor'] as const;
+const META_NODE_TYPES = ['aiQuery', 'aiAdvisor', 'aiSummarizeData', 'aiDiagnose', 'canvasNote'] as const;
 
 /**
  * Exclude AI/meta nodes (e.g. aiQuery, aiAdvisor) and their edges from the pipeline.

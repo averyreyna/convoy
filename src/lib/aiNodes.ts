@@ -4,7 +4,7 @@ import type {
   EditNodesResponse,
   AnswerAboutNodesResponse,
 } from '@/types';
-import { editNodes, answerAboutNodes } from '@/lib/api';
+import { editNodes, answerAboutNodes, diagnoseNodesWithAi as diagnoseNodesWithAiApi } from '@/lib/api';
 
 export async function suggestPipelineForContext(params: {
   nodeIds: string[];
@@ -34,5 +34,15 @@ export async function answerQuestionAboutNodes(params: {
     schema,
     pipelineContext,
   });
+}
+
+export async function diagnoseNodesWithAi(params: {
+  nodeIds: string[];
+  question?: string;
+  schema?: EditNodesSchema;
+  sampleRows?: Record<string, unknown>[];
+  pipelineContext?: EditNodesPipelineContext;
+}): Promise<{ diagnosis: string }> {
+  return diagnoseNodesWithAiApi(params);
 }
 

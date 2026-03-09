@@ -13,6 +13,8 @@ import {
   Search,
   MessageCircle,
   Brush,
+  FileText,
+  Bug,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -29,7 +31,8 @@ import {
   divider,
 } from '@/flank';
 
-const AI_NODE_TYPES = new Set(['aiQuery', 'aiAdvisor', 'aiCleanData']);
+const AI_NODE_TYPES = new Set(['aiQuery', 'aiAdvisor', 'aiCleanData', 'aiSummarizeData', 'aiDiagnose']);
+const PALETTE_HIDDEN_TYPES = new Set(['canvasNote']);
 
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
@@ -44,6 +47,8 @@ const iconMap: Record<string, React.ReactNode> = {
   search: <Search size={16} />,
   messageCircle: <MessageCircle size={16} />,
   brush: <Brush size={16} />,
+  fileText: <FileText size={16} />,
+  bug: <Bug size={16} />,
 };
 
 export function NodePalette() {
@@ -56,7 +61,7 @@ export function NodePalette() {
     const info = nodeTypeInfos.find((n) => n.type === type);
     if (!info) return;
     const supportsCodeMode =
-      type !== 'dataSource' && type !== 'transform' && type !== 'aiQuery' && type !== 'aiAdvisor' && type !== 'aiCleanData';
+      type !== 'dataSource' && type !== 'transform' && type !== 'aiQuery' && type !== 'aiAdvisor' && type !== 'aiCleanData' && type !== 'aiSummarizeData' && type !== 'aiDiagnose';
     const x = 120 + nodes.length * 320;
     const y = 120;
     addNode({
@@ -76,14 +81,12 @@ export function NodePalette() {
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* Sections: AI, Data, Nodes (alphabetical) */}
         <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
-          {/* AI */}
           <div className={sectionClass}>
             <p className={label}>AI</p>
             <div className={listGap}>
               {nodeTypeInfos
-                .filter((info) => AI_NODE_TYPES.has(info.type))
+                .filter((info) => AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
                 .sort((a, b) => a.label.localeCompare(b.label))
                 .map((info) => (
                   <button
@@ -102,7 +105,6 @@ export function NodePalette() {
             </div>
           </div>
 
-          {/* Data */}
           <div className={sectionClass}>
             <p className={label}>Data</p>
             <div className={listGap}>
@@ -117,12 +119,11 @@ export function NodePalette() {
             </div>
           </div>
 
-          {/* Nodes */}
           <div className={sectionClass}>
             <p className={label}>Nodes</p>
             <div className={listGap}>
               {nodeTypeInfos
-                .filter((info) => !AI_NODE_TYPES.has(info.type))
+                .filter((info) => !AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
                 .sort((a, b) => a.label.localeCompare(b.label))
                 .map((info) => (
                   <button
@@ -142,7 +143,6 @@ export function NodePalette() {
           </div>
         </div>
 
-        {/* Footer hint */}
         <div className={cn(divider, panelSectionHeader, 'border-b-0 border-t-0 py-1.5')}>
           <p className={cn('text-center', captionMuted)}>
             Connect nodes by dragging between handles

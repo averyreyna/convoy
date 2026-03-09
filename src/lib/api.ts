@@ -218,6 +218,53 @@ export async function answerAboutNodes(params: {
 }
 
 /**
+ * Diagnose connected node(s). Sends node IDs, optional question, output schema/sample rows,
+ * and pipeline context. Returns a plain-language diagnosis (creates a canvas note in the UI).
+ */
+export async function diagnoseNodesWithAi(params: {
+  nodeIds: string[];
+  question?: string;
+  schema?: EditNodesSchema;
+  sampleRows?: Record<string, unknown>[];
+  pipelineContext?: EditNodesPipelineContext;
+}): Promise<{ diagnosis: string }> {
+  const { nodeIds, question, schema, sampleRows, pipelineContext } = params;
+
+  const url = `${API_BASE || ''}/api/diagnose-nodes`.replace(/\/+/, '/');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nodeIds,
+      ...(question !== undefined && question !== '' && { question }),
+      ...(schema && { schema }),
+      ...(sampleRows && { sampleRows }),
+      ...(pipelineContext && { pipelineContext }),
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    let message: string;
+    try {
+      const body = JSON.parse(text) as { error?: string };
+      message = body.error || `Diagnose nodes failed (${response.status})`;
+    } catch {
+      message = text
+        ? `Diagnose nodes failed (${response.status}). ${text.slice(0, 200)}`
+        : `Diagnose nodes failed (${response.status}). No details from server.`;
+    }
+    throw new Error(message);
+  }
+
+  const data = (await response.json()) as { diagnosis?: string };
+  if (typeof data.diagnosis !== 'string') {
+    throw new Error('Invalid diagnose-nodes response: missing diagnosis');
+  }
+  return { diagnosis: data.diagnosis };
+}
+
+/**
  * Render a chart on the backend with Python/matplotlib.
  * Returns base64 data URL (PNG) or raw SVG string.
  */
@@ -295,4 +342,45 @@ export async function cleanDataWithAi(params: {
     throw new Error('Invalid clean-data response: missing code');
   }
   return { code: data.code };
+}
+
+/**
+ * Summarize a dataset in plain language. Sends schema and optional sample rows
+ * and prompt; returns a short summary string for display in a canvas note.
+ */
+export async function summarizeDataWithAi(params: {
+  schema: EditNodesSchema;
+  sampleRows?: Record<string, unknown>[];
+  prompt?: string;
+}): Promise<{ summary: string; title?: string }> {
+  const { schema, sampleRows, prompt } = params;
+  const url = `${API_BASE || ''}/api/summarize-data`.replace(/\/+/, '/');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ schema, sampleRows, prompt }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    let message: string;
+    try {
+      const body = JSON.parse(text) as { error?: string };
+      message = body.error || `Summarize data failed (${response.status})`;
+    } catch {
+      message = text
+        ? `Summarize data failed (${response.status}). ${text.slice(0, 200)}`
+        : `Summarize data failed (${response.status}). No details from server.`;
+    }
+    throw new Error(message);
+  }
+
+  const data = (await response.json()) as { summary?: string; title?: string };
+  if (typeof data.summary !== 'string') {
+    throw new Error('Invalid summarize-data response: missing summary');
+  }
+  return {
+    summary: data.summary,
+    title: typeof data.title === 'string' ? data.title.trim() || undefined : undefined,
+  };
 }
