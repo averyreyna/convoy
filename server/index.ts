@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import { getClient } from './lib/ai.ts';
-import pipelineRouter from './routes/pipeline.ts';
 import explainRouter from './routes/explain.ts';
 import importPythonRouter from './routes/import/python.ts';
 import dataRouter from './routes/data.ts';
@@ -19,7 +18,6 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
-app.use('/api', pipelineRouter);
 app.use('/api', editNodesRouter);
 app.use('/api', answerAboutNodesRouter);
 app.use('/api', explainRouter);

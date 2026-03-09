@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { ChevronLeft, ChevronRight, Code2, Globe, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Code2, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { ConvoyCanvas, NodePalette, SidebarHeader, PipelineCodePanel } from '@/components/canvas';
@@ -13,7 +13,6 @@ const DEFAULT_CODE_PCT = 38;
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [codeEditorOpen, setCodeEditorOpen] = useState(true);
-  const setShowPrompt = useCanvasStore((s) => s.setShowPrompt);
   const [codePanelPct, setCodePanelPct] = useState(DEFAULT_CODE_PCT);
   const isDragging = useRef(false);
 
@@ -102,17 +101,7 @@ export default function App() {
             style={{ width: codeEditorOpen ? `${canvasPct}%` : '100%' }}
           >
             <ConvoyCanvas />
-            {/* Bottom toolbar: centered in canvas area; spacing updates when code panel opens/closes */}
-            <button
-              type="button"
-              onClick={() => setShowPrompt(true)}
-              className="absolute bottom-5 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center gap-2 rounded-lg border border-gray-300 bg-gray-800 px-4 shadow-md hover:border-gray-400 hover:bg-gray-700"
-              title="Describe what you want to visualize"
-              aria-label="Describe what you want to visualize"
-            >
-              <Sparkles size={16} className="text-amber-300" />
-              <span className="text-sm font-medium text-white">Describe</span>
-            </button>
+            {/* Bottom toolbar */}
             <button
               type="button"
               onClick={() => setCodeEditorOpen((v) => !v)}

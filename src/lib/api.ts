@@ -4,7 +4,6 @@
  */
 
 import type {
-  ProposedPipeline,
   ImportFromPythonResponse,
   EditNodesSchema,
   EditNodesPipelineContext,
@@ -21,43 +20,6 @@ export type { EditNodesSchema, EditNodesPipelineContext, EditNodesResponse, Sugg
  * VITE_API_URL only when you need to point at a different API host.
  */
 const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
-
-interface DataSchema {
-  columns: Array<{ name: string; type: string }>;
-}
-
-/**
- * Generate a pipeline of transformation nodes from a natural language prompt.
- * Sends the prompt and data schema to the backend, which calls Claude to
- * produce a structured pipeline response.
- */
-export async function generatePipeline(
-  userPrompt: string,
-  dataSchema: DataSchema
-): Promise<ProposedPipeline> {
-  const response = await fetch('/api/generate-pipeline', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt: userPrompt,
-      schema: dataSchema,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `API request failed with status ${response.status}`);
-  }
-
-  const pipeline: ProposedPipeline = await response.json();
-
-  // Validate structure
-  if (!pipeline.nodes || !Array.isArray(pipeline.nodes)) {
-    throw new Error('Invalid pipeline response: missing nodes array');
-  }
-
-  return pipeline;
-}
 
 /**
  * Generate a plain-language explanation for a node.

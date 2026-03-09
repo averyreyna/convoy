@@ -27,9 +27,6 @@ interface CanvasStore {
   showImportModal: boolean;
   setShowImportModal: (show: boolean) => void;
 
-  showPrompt: boolean;
-  setShowPrompt: (show: boolean) => void;
-
   // Baseline (for diff viewer): set on import or "Pin current"
   baselineCode: string | null;
   baselineLanguage: BaselineLanguage | null;
@@ -85,9 +82,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   showImportModal: false,
   setShowImportModal: (show) => set({ showImportModal: show }),
-
-  showPrompt: false,
-  setShowPrompt: (show) => set({ showPrompt: show }),
 
   baselineCode: null,
   baselineLanguage: null,
