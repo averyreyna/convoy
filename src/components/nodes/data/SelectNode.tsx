@@ -29,7 +29,7 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
   );
 
   // Execute the node and get upstream data for column list
-  const { upstreamData } = useNodeExecution(
+  const { upstreamData, isExecuting } = useNodeExecution(
     id,
     'select',
     config,
@@ -77,6 +77,7 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
       outputRowCount={data.outputRowCount}
       customCode={data.customCode}
       errorMessage={data.error}
+      isExecuting={isExecuting}
     >
       <div className="space-y-2">
         <div>

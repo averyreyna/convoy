@@ -90,6 +90,13 @@ export interface AiAdvisorNodeData extends BaseNodeData {
   answer?: string;
 }
 
+export interface AiCleanDataNodeData extends BaseNodeData {
+  instruction?: string;
+  generatedCode?: string;
+  inputRowCount?: number;
+  outputRowCount?: number;
+}
+
 export type ConvoyNodeData =
   | DataSourceNodeData
   | FilterNodeData
@@ -101,7 +108,8 @@ export type ConvoyNodeData =
   | ReshapeNodeData
   | TransformNodeData
   | AiQueryNodeData
-  | AiAdvisorNodeData;
+  | AiAdvisorNodeData
+  | AiCleanDataNodeData;
 
 export interface NodeTypeToData {
   dataSource: DataSourceNodeData;
@@ -115,6 +123,7 @@ export interface NodeTypeToData {
   reshape: ReshapeNodeData;
   aiQuery: AiQueryNodeData;
   aiAdvisor: AiAdvisorNodeData;
+  aiCleanData: AiCleanDataNodeData;
 }
 
 export type NodeType = keyof NodeTypeToData;

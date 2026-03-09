@@ -28,7 +28,7 @@ export function ComputedColumnNode({ id, data, selected }: ComputedColumnNodePro
   );
 
   // Execute the node and get upstream data for column references
-  const { upstreamData } = useNodeExecution(
+  const { upstreamData, isExecuting } = useNodeExecution(
     id,
     'computedColumn',
     config,
@@ -55,6 +55,7 @@ export function ComputedColumnNode({ id, data, selected }: ComputedColumnNodePro
       outputRowCount={data.outputRowCount}
       customCode={data.customCode}
       errorMessage={data.error}
+      isExecuting={isExecuting}
     >
       <div className="space-y-2">
         {/* New column name */}

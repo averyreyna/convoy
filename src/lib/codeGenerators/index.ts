@@ -46,6 +46,13 @@ export function generateNodeCode(
       return generateComputedColumnCode(config);
     case 'reshape':
       return generateReshapeCode(config);
+    case 'aiCleanData': {
+      const generatedCode = config.generatedCode;
+      if (typeof generatedCode === 'string' && generatedCode.trim() !== '') {
+        return generatedCode.trim();
+      }
+      return '# AI Clean Data — run in app to generate code';
+    }
     default:
       return `# Unknown node type: ${nodeType}\n# Configure the node to generate code`;
   }
@@ -220,8 +227,9 @@ plt.show()`;
     case 'area':
       return `import matplotlib.pyplot as plt
 plt.figure(figsize=(10, 6))
-plt.fill_between(range(len(df)), df["${yAxis}"], alpha=0.3)
-plt.plot(range(len(df)), df["${yAxis}"])
+y_vals = pd.to_numeric(df["${yAxis}"], errors="coerce")
+plt.fill_between(range(len(df)), y_vals, alpha=0.3)
+plt.plot(range(len(df)), y_vals)
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
 plt.title("${yAxis} by ${xAxis}")

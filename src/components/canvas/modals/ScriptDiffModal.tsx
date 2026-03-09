@@ -1,9 +1,9 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import { diffLines, type Change } from 'diff';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
-import { exportAsPython } from '@/lib/exportPipeline';
+import { exportAsPythonWithLineMap } from '@/lib/exportPipeline';
 import {
   modalOverlay,
   modalPanel,
@@ -60,10 +60,12 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const baselineCode = useCanvasStore((s) => s.baselineCode);
+  const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
+  const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
 
-  const currentExport = useMemo(() => {
-    if (nodes.length === 0) return '';
-    return exportAsPython(nodes, edges);
+  const { script: currentExport, getNodeIdForLine } = useMemo(() => {
+    if (nodes.length === 0) return { script: '', getNodeIdForLine: (_: number) => null as string | null };
+    return exportAsPythonWithLineMap(nodes, edges);
   }, [nodes, edges]);
 
   const leftText = baselineCode ?? '';
@@ -74,6 +76,18 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
     if (!hasBaseline) return null;
     return buildDiffRows(leftText, rightText);
   }, [leftText, rightText, hasBaseline]);
+
+  const handleLineClick = useCallback(
+    (lineNum: number) => {
+      const nodeId = getNodeIdForLine(lineNum);
+      if (nodeId) {
+        setSelectedNodeIds([nodeId]);
+        setFocusNodeIdForView(nodeId);
+        onClose();
+      }
+    },
+    [getNodeIdForLine, setSelectedNodeIds, setFocusNodeIdForView, onClose]
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -162,11 +176,40 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
               {diffRows ? (
                 <div className="min-h-full">
                   {diffRows.map((row, i) => {
+                    const hasRightNum = row.kind === 'added' || row.kind === 'unchanged';
+                    const lineNum = hasRightNum && 'rightNum' in row ? row.rightNum : null;
+                    const isClickable = lineNum != null && getNodeIdForLine(lineNum) != null;
+                    const baseClass = 'flex py-0.5 pl-2 pr-2';
+                    const clickableClass = isClickable
+                      ? 'cursor-pointer hover:bg-gray-100 rounded'
+                      : '';
                     if (row.kind === 'added') {
                       return (
                         <div
                           key={`r-${i}`}
-                          className="flex border-l-2 border-emerald-500 bg-emerald-50 py-0.5 pl-2 pr-2 text-emerald-900"
+                          role={isClickable ? 'button' : undefined}
+                          tabIndex={isClickable ? 0 : undefined}
+                          onClick={
+                            isClickable
+                              ? () => handleLineClick(row.rightNum!)
+                              : undefined
+                          }
+                          onKeyDown={
+                            isClickable
+                              ? (e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleLineClick(row.rightNum!);
+                                  }
+                                }
+                              : undefined
+                          }
+                          className={cn(
+                            'border-l-2 border-emerald-500 bg-emerald-50 text-emerald-900',
+                            baseClass,
+                            clickableClass
+                          )}
+                          title={isClickable ? 'Click to focus this node and close' : undefined}
                         >
                           <span className="select-none pr-2 text-gray-400">{row.rightNum}</span>
                           <span className="break-all">{row.text || ' '}</span>
@@ -175,14 +218,35 @@ export function ScriptDiffModal({ isOpen, onClose }: ScriptDiffModalProps) {
                     }
                     if (row.kind === 'unchanged') {
                       return (
-                        <div key={`r-${i}`} className="flex py-0.5 pl-2 pr-2 text-gray-800">
+                        <div
+                          key={`r-${i}`}
+                          role={isClickable ? 'button' : undefined}
+                          tabIndex={isClickable ? 0 : undefined}
+                          onClick={
+                            isClickable
+                              ? () => handleLineClick(row.rightNum!)
+                              : undefined
+                          }
+                          onKeyDown={
+                            isClickable
+                              ? (e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleLineClick(row.rightNum!);
+                                  }
+                                }
+                              : undefined
+                          }
+                          className={cn('text-gray-800', baseClass, clickableClass)}
+                          title={isClickable ? 'Click to focus this node and close' : undefined}
+                        >
                           <span className="select-none pr-2 text-gray-400">{row.rightNum}</span>
                           <span className="break-all">{row.text || ' '}</span>
                         </div>
                       );
                     }
                     return (
-                      <div key={`r-${i}`} className="flex py-0.5 pl-2 pr-2 text-gray-300">
+                      <div key={`r-${i}`} className={cn('text-gray-300', baseClass)}>
                         <span className="pr-2"> </span>
                         <span> </span>
                       </div>

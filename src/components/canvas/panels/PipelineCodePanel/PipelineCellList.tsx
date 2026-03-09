@@ -66,6 +66,8 @@ interface PipelineCellListProps {
   onActivateCell: (nodeId: string) => void;
   onClearFocusedCell: () => void;
   onCellCodeChange: (nodeId: string, code: string) => void;
+  onRevertCell?: (nodeId: string) => void;
+  onAcceptAsBaseline?: (nodeId: string) => void;
 }
 
 export function PipelineCellList({
@@ -82,6 +84,8 @@ export function PipelineCellList({
   onActivateCell,
   onClearFocusedCell,
   onCellCodeChange,
+  onRevertCell,
+  onAcceptAsBaseline,
 }: PipelineCellListProps) {
   if (cells.length === 0) {
     return null;
@@ -213,7 +217,50 @@ export function PipelineCellList({
                     <span className={caption}>Changed since last run</span>
                   </button>
                   {cellDiffExpanded && (
-                    <div className="max-h-32 overflow-auto px-2 pb-2 font-mono text-[10px]">
+                    <div className="px-2 pb-2">
+                      {(onRevertCell || onAcceptAsBaseline) && (
+                        <div className="mb-2 flex flex-wrap gap-1">
+                          {onRevertCell && baseline && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRevertCell(cell.nodeId);
+                              }}
+                              className={cn(
+                                button.base,
+                                button.variants.ghost,
+                                button.sizes.sm,
+                                'text-gray-700 hover:bg-gray-200'
+                              )}
+                              title="Restore this cell to the last run state"
+                              aria-label="Revert to last run"
+                            >
+                              Revert to last run
+                            </button>
+                          )}
+                          {onAcceptAsBaseline && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onAcceptAsBaseline(cell.nodeId);
+                              }}
+                              className={cn(
+                                button.base,
+                                button.variants.ghost,
+                                button.sizes.sm,
+                                'text-gray-700 hover:bg-gray-200'
+                              )}
+                              title="Set current state as the new baseline for this cell"
+                              aria-label="Accept as baseline"
+                            >
+                              Accept as baseline
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <div className="max-h-32 overflow-auto font-mono text-[10px]">
                       {configChanged && baseline && (
                         <div className="mb-2">
                           <div className={cn('mb-0.5', caption)}>Config</div>
@@ -253,6 +300,7 @@ export function PipelineCellList({
                           </div>
                         </div>
                       )}
+                      </div>
                     </div>
                   )}
                 </div>

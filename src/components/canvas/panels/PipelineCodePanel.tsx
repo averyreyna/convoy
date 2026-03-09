@@ -6,6 +6,7 @@ import { generateNodeCode } from '@/lib/codeGenerators';
 import {
   topologicalSortPipeline,
   exportAsPython,
+  exportAsPythonWithLineMap,
   buildScriptFromCellCodes,
   buildScriptForBrowserRun,
   downloadPipelineScript,
@@ -45,7 +46,9 @@ export function PipelineCodePanel() {
   const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
   const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
   const setBaselineFromPin = useCanvasStore((s) => s.setBaselineFromPin);
+  const setBaselineForSelection = useCanvasStore((s) => s.setBaselineForSelection);
   const setBaselineForNodeIds = useCanvasStore((s) => s.setBaselineForNodeIds);
+  const setPipelineRunInProgress = useCanvasStore((s) => s.setPipelineRunInProgress);
   const baselineCode = useCanvasStore((s) => s.baselineCode);
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
   const nodeData = useDataStore((s) => s.nodeData);
@@ -145,6 +148,7 @@ export function PipelineCodePanel() {
     ) => {
       setRunError(null);
       setIsRunning(true);
+      setPipelineRunInProgress(true);
       try {
         await runFullPipelineScript(scriptForRun);
         const { pipeline } = await importPipelineFromPython(scriptForImport);
@@ -174,6 +178,7 @@ export function PipelineCodePanel() {
         setRunError(msg || 'Run failed');
       } finally {
         setIsRunning(false);
+        setPipelineRunInProgress(false);
       }
     },
     [
@@ -181,6 +186,7 @@ export function PipelineCodePanel() {
       setPipelineFromImport,
       setBaselineFromPin,
       setBaselineForNodeIds,
+      setPipelineRunInProgress,
       nodes.length,
       draftCells.length,
     ]
@@ -220,6 +226,25 @@ export function PipelineCodePanel() {
       }
     },
     [updateNode]
+  );
+
+  const handleRevertCell = useCallback(
+    (nodeId: string) => {
+      const baseline = baselineByNodeId[nodeId];
+      if (!baseline) return;
+      updateNode(nodeId, {
+        ...baseline.config,
+        customCode: baseline.customCode ?? undefined,
+      });
+    },
+    [baselineByNodeId, updateNode]
+  );
+
+  const handleAcceptAsBaseline = useCallback(
+    (nodeId: string) => {
+      setBaselineForNodeIds([nodeId]);
+    },
+    [setBaselineForNodeIds]
   );
 
   const handleCopy = useCallback(async () => {
@@ -338,10 +363,27 @@ export function PipelineCodePanel() {
     replaceNodesWithSuggestedPipeline,
   ]);
 
-  const currentExportForDiff = useMemo(() => {
-    if (nodes.length === 0) return '';
-    return exportAsPython(nodes, edges);
+  const { script: currentExportForDiff, getNodeIdForLine } = useMemo(() => {
+    if (nodes.length === 0) return { script: '', getNodeIdForLine: (_: number) => null as string | null };
+    return exportAsPythonWithLineMap(nodes, edges);
   }, [nodes, edges]);
+
+  const handlePinSelection = useCallback(() => {
+    setBaselineFromPin(currentExportForDiff, 'python');
+    setBaselineForSelection();
+  }, [currentExportForDiff, setBaselineFromPin, setBaselineForSelection]);
+
+  const handleDiffLineClick = useCallback(
+    (lineNum: number) => {
+      const nodeId = getNodeIdForLine(lineNum);
+      if (nodeId) {
+        setSelectedNodeIds([nodeId]);
+        activateCell(nodeId);
+        setFocusNodeIdForView(nodeId);
+      }
+    },
+    [getNodeIdForLine, setSelectedNodeIds, activateCell, setFocusNodeIdForView]
+  );
 
   const fullDiffRows: FullDiffRow[] | null = useMemo(() => {
     if (!baselineCode || baselineCode.length === 0) return null;
@@ -413,6 +455,8 @@ export function PipelineCodePanel() {
         <PipelineCodeToolbar
           canEditWithAI={selectedNodeIdsArray.length > 0}
           onToggleEditWithAI={() => setEditWithAIOpen((v) => !v)}
+          canPinSelection={selectedNodeIdsArray.length > 0}
+          onPinSelection={handlePinSelection}
           canRunAll={cells.length > 0}
           isRunning={isRunning}
           onRunAll={handleRunAll}
@@ -484,6 +528,8 @@ export function PipelineCodePanel() {
             onActivateCell={activateCell}
             onClearFocusedCell={() => setFocusedCellNodeId(null)}
             onCellCodeChange={handleCellChange}
+            onRevertCell={handleRevertCell}
+            onAcceptAsBaseline={handleAcceptAsBaseline}
           />
         )}
       </div>
@@ -493,6 +539,7 @@ export function PipelineCodePanel() {
         fullDiffExpanded={fullDiffExpanded}
         onToggleFullDiff={() => setFullDiffExpanded((x) => !x)}
         rows={fullDiffRows}
+        onLineClick={handleDiffLineClick}
       />
     </div>
   );

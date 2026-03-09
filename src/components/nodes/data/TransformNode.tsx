@@ -40,7 +40,7 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
   );
 
   // Execute the node
-  const { upstreamData } = useNodeExecution(
+  const { upstreamData, isExecuting } = useNodeExecution(
     id,
     'transform',
     config,
@@ -66,6 +66,7 @@ export function TransformNode({ id, data, selected }: TransformNodeProps) {
       outputRowCount={data.outputRowCount}
       customCode={code}
       errorMessage={data.error}
+      isExecuting={isExecuting}
     >
       <div className="space-y-2">
         <p className={caption}>

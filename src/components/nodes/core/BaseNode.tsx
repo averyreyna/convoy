@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { ReactNode } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Square, CheckSquare } from 'lucide-react';
+import { Square, CheckSquare, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import {
@@ -36,6 +36,8 @@ interface BaseNodeProps {
   wide?: boolean;
   errorMessage?: string;
   selected?: boolean;
+  /** When true, show a loading indicator (Python/node execution in progress). */
+  isExecuting?: boolean;
 }
 
 export const BaseNode = memo(function BaseNode({
@@ -55,6 +57,7 @@ export const BaseNode = memo(function BaseNode({
   wide,
   errorMessage,
   selected,
+  isExecuting = false,
 }: BaseNodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
@@ -109,6 +112,9 @@ export const BaseNode = memo(function BaseNode({
         )}
         <span className={nodeHeaderTitle}>{title}</span>
         <div className="ml-auto flex items-center gap-1">
+          {isExecuting && (
+            <Loader2 size={14} className="animate-spin text-gray-500" aria-label="Running" />
+          )}
           {showExplanation && (
             <ExplanationPopover
               nodeType={nodeType}

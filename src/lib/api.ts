@@ -258,3 +258,41 @@ export async function renderChart(params: {
   }
   return data;
 }
+
+/**
+ * Generate Python code to clean/filter data from a natural language instruction.
+ * Sends schema and optional sample rows; returns code that runs in-browser with the upstream DataFrame.
+ */
+export async function cleanDataWithAi(params: {
+  instruction: string;
+  schema: EditNodesSchema;
+  sampleRows?: Record<string, unknown>[];
+}): Promise<{ code: string }> {
+  const { instruction, schema, sampleRows } = params;
+  const url = `${API_BASE || ''}/api/clean-data`.replace(/\/+/, '/');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instruction, schema, sampleRows }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    let message: string;
+    try {
+      const body = JSON.parse(text) as { error?: string };
+      message = body.error || `Clean data failed (${response.status})`;
+    } catch {
+      message = text
+        ? `Clean data failed (${response.status}). ${text.slice(0, 200)}`
+        : `Clean data failed (${response.status}). No details from server.`;
+    }
+    throw new Error(message);
+  }
+
+  const data = (await response.json()) as { code?: string };
+  if (typeof data.code !== 'string') {
+    throw new Error('Invalid clean-data response: missing code');
+  }
+  return { code: data.code };
+}

@@ -1,6 +1,7 @@
 /**
  * In-browser Python execution via Pyodide.
  * Loads Pyodide once, runs user/generated Python code with pandas, returns DataFrame result.
+ * Execution is serialized through a single-job queue so only one Python run is active at a time.
  */
 
 import { loadPyodide } from 'pyodide';
@@ -24,6 +25,18 @@ function getPyodide(): Promise<PyodideInstance> {
   return pyodidePromise;
 }
 
+/** Single-job queue: only one Python run at a time. */
+let queueTail: Promise<void> = Promise.resolve();
+
+function enqueue<T>(job: () => Promise<T>): Promise<T> {
+  const prev = queueTail;
+  let resolveNext: () => void;
+  queueTail = new Promise<void>((r) => {
+    resolveNext = r;
+  });
+  return prev.then(() => job()).finally(() => resolveNext());
+}
+
 /**
  * Run Python code with input dataframe in scope as `df`.
  * Returns the resulting dataframe (must be named `df` in the Python scope).
@@ -37,6 +50,13 @@ export async function runPythonWithDataFrame(
     return { columns: input.columns, rows: [] };
   }
 
+  return enqueue(() => runPythonWithDataFrameImpl(input, code));
+}
+
+async function runPythonWithDataFrameImpl(
+  input: DataFrame,
+  code: string
+): Promise<DataFrame> {
   console.log('[Convoy runPythonWithDataFrame]', {
     inputRows: input.rows.length,
     inputCols: input.columns.map((c) => c.name),
@@ -109,6 +129,10 @@ _result_
  * is then sent to import-from-Python to propose nodes.
  */
 export async function runFullPipelineScript(script: string): Promise<void> {
+  return enqueue(() => runFullPipelineScriptImpl(script));
+}
+
+async function runFullPipelineScriptImpl(script: string): Promise<void> {
   const pyodide = await getPyodide();
   if (!pyodide) throw new Error('Pyodide not loaded');
 

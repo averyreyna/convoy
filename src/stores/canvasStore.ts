@@ -69,6 +69,10 @@ interface CanvasStore {
   // Selection (canvas + code panel): set selected node IDs so both surfaces stay in sync
   setSelectedNodeIds: (nodeIds: string[]) => void;
 
+  // Run all / Run cell in progress: when true, per-node execution skips starting new runs
+  pipelineRunInProgress: boolean;
+  setPipelineRunInProgress: (value: boolean) => void;
+
   // React Flow callbacks
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
@@ -353,7 +357,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const imp = pipelineNodes[idx];
       const type = imp.type;
       const config = (imp.config || {}) as Record<string, unknown>;
-      const supportsCodeMode = type !== 'dataSource' && type !== 'transform';
+      const supportsCodeMode = type !== 'dataSource' && type !== 'transform' && type !== 'aiCleanData';
       const data = { ...node.data, ...config } as Record<string, unknown>;
       if ((node.data as Record<string, unknown>)?.state !== undefined)
         data.state = (node.data as Record<string, unknown>).state;
@@ -385,7 +389,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         const nodeId = `import-${timestamp}-${index}`;
         const type = nodeConfig.type;
         const supportsCodeMode =
-          type !== 'dataSource' && type !== 'transform';
+          type !== 'dataSource' && type !== 'transform' && type !== 'aiCleanData';
         appendNodes.push({
           id: nodeId,
           type,
@@ -468,7 +472,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }
 
     const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
-    const validTypes = new Set(['dataSource', 'filter', 'groupBy', 'sort', 'select', 'chart', 'computedColumn', 'reshape', 'transform']);
+    const validTypes = new Set(['dataSource', 'filter', 'groupBy', 'sort', 'select', 'chart', 'computedColumn', 'reshape', 'transform', 'aiCleanData']);
     const timestamp = Date.now();
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
@@ -479,7 +483,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     for (let i = 0; i < suggestedNodes.length; i++) {
       const spec = suggestedNodes[i];
       const nodeType = spec.type && validTypes.has(spec.type) ? spec.type : 'transform';
-      const supportsCodeMode = nodeType !== 'dataSource' && nodeType !== 'transform';
+      const supportsCodeMode = nodeType !== 'dataSource' && nodeType !== 'transform' && nodeType !== 'aiCleanData';
       const nodeId = `ai-${timestamp}-${i}`;
 
       const data: Record<string, unknown> = {
@@ -571,6 +575,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         selected: nodeIds.includes(node.id),
       })),
     })),
+
+  pipelineRunInProgress: false,
+  setPipelineRunInProgress: (value) => set({ pipelineRunInProgress: value }),
 
   onNodesChange: (changes) =>
     set((state) => ({

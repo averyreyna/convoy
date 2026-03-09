@@ -1,10 +1,12 @@
-import { Copy, Download, FileCode, Play, Plus, Square, Wand2 } from 'lucide-react';
+import { Copy, Download, FileCode, Pin, Play, Plus, Square, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { label, button } from '@/flank';
 
 interface PipelineCodeToolbarProps {
   canEditWithAI: boolean;
   onToggleEditWithAI: () => void;
+  canPinSelection: boolean;
+  onPinSelection: () => void;
   canRunAll: boolean;
   isRunning: boolean;
   onRunAll: () => void;
@@ -23,6 +25,8 @@ interface PipelineCodeToolbarProps {
 export function PipelineCodeToolbar({
   canEditWithAI,
   onToggleEditWithAI,
+  canPinSelection,
+  onPinSelection,
   canRunAll,
   isRunning,
   onRunAll,
@@ -38,9 +42,9 @@ export function PipelineCodeToolbar({
   onAddCell,
 }: PipelineCodeToolbarProps) {
   return (
-    <div className="flex shrink-0 items-center justify-between">
-      <span className={label}>Pipeline code</span>
-      <div className="flex items-center gap-0.5">
+    <div className="flex shrink-0 w-full items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <span className={label}>Pipeline code</span>
         <button
           type="button"
           onClick={onToggleEditWithAI}
@@ -58,6 +62,21 @@ export function PipelineCodeToolbar({
         </button>
         <button
           type="button"
+          onClick={onPinSelection}
+          disabled={!canPinSelection}
+          className={cn(
+            button.base,
+            button.variants.ghost,
+            button.sizes.sm,
+            'disabled:opacity-50'
+          )}
+          title="Set baseline from selected cells (compare changes later)"
+        >
+          <Pin size={13} />
+          Pin selection
+        </button>
+        <button
+          type="button"
           onClick={onRunAll}
           disabled={!canRunAll || isRunning}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
@@ -70,6 +89,8 @@ export function PipelineCodeToolbar({
           )}
           Run all
         </button>
+      </div>
+      <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={onCopyScript}

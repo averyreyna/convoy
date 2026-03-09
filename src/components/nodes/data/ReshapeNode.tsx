@@ -31,7 +31,7 @@ export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
   );
 
   // Execute the node and get upstream data for column list
-  const { upstreamData } = useNodeExecution(
+  const { upstreamData, isExecuting } = useNodeExecution(
     id,
     'reshape',
     config,
@@ -69,6 +69,7 @@ export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
       outputRowCount={data.outputRowCount}
       customCode={data.customCode}
       errorMessage={data.error}
+      isExecuting={isExecuting}
     >
       <div className="space-y-2">
         {/* Key column name (the new column that holds the original column names) */}

@@ -9,18 +9,13 @@ export interface NodeDataPayload {
 }
 
 interface DataStore {
-  // Data stored per node ID (DataSource-specific payload)
   nodeData: Record<string, NodeDataPayload>;
-
-  // Generic DataFrame outputs per node (used by all nodes including DataSource)
   nodeOutputs: Record<string, DataFrame>;
 
-  // DataSource operations
   setNodeData: (nodeId: string, data: NodeDataPayload) => void;
   getNodeData: (nodeId: string) => NodeDataPayload | undefined;
   removeNodeData: (nodeId: string) => void;
 
-  // Generic output operations
   setNodeOutput: (nodeId: string, data: DataFrame) => void;
   getNodeOutput: (nodeId: string) => DataFrame | undefined;
   removeNodeOutput: (nodeId: string) => void;

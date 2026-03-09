@@ -9,9 +9,10 @@ import {
   BarChart3,
   Calculator,
   FlipVertical2,
-  FileCode,
-  Sparkles,
+  FileInput,
+  Search,
   MessageCircle,
+  Brush,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -28,6 +29,8 @@ import {
   divider,
 } from '@/flank';
 
+const AI_NODE_TYPES = new Set(['aiQuery', 'aiAdvisor', 'aiCleanData']);
+
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
   filter: <Filter size={16} />,
@@ -38,8 +41,9 @@ const iconMap: Record<string, React.ReactNode> = {
   barChart3: <BarChart3 size={16} />,
   calculator: <Calculator size={16} />,
   flipVertical2: <FlipVertical2 size={16} />,
-  sparkles: <Sparkles size={16} />,
+  search: <Search size={16} />,
   messageCircle: <MessageCircle size={16} />,
+  brush: <Brush size={16} />,
 };
 
 export function NodePalette() {
@@ -52,7 +56,7 @@ export function NodePalette() {
     const info = nodeTypeInfos.find((n) => n.type === type);
     if (!info) return;
     const supportsCodeMode =
-      type !== 'dataSource' && type !== 'transform' && type !== 'aiQuery' && type !== 'aiAdvisor';
+      type !== 'dataSource' && type !== 'transform' && type !== 'aiQuery' && type !== 'aiAdvisor' && type !== 'aiCleanData';
     const x = 120 + nodes.length * 320;
     const y = 120;
     addNode({
@@ -66,47 +70,80 @@ export function NodePalette() {
     });
   };
 
+  const sectionClass = cn(panelSection, 'border-b-0 py-1.5');
+  const listGap = 'flex flex-col gap-0.5 mt-0.5';
+
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* Data / get started */}
-        <div className={panelSection}>
-          <p className={label}>Data</p>
-          <div className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={() => setShowImportModal(true)}
-              className={paletteItem}
-            >
-              <FileCode size={14} className={paletteItemIcon} />
-              <span className={paletteItemTitle}>Import Python</span>
-            </button>
+        {/* Sections: AI, Data, Nodes (alphabetical) */}
+        <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
+          {/* AI */}
+          <div className={sectionClass}>
+            <p className={label}>AI</p>
+            <div className={listGap}>
+              {nodeTypeInfos
+                .filter((info) => AI_NODE_TYPES.has(info.type))
+                .sort((a, b) => a.label.localeCompare(b.label))
+                .map((info) => (
+                  <button
+                    key={info.type}
+                    type="button"
+                    onClick={() => handleAddNode(info.type)}
+                    className={paletteItem}
+                  >
+                    <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className={paletteItemTitle}>{info.label}</div>
+                      <div className={paletteItemDescription}>{info.description}</div>
+                    </div>
+                  </button>
+                ))}
+            </div>
           </div>
-        </div>
 
-        {/* Node types — click to add */}
-        <div className="flex-1 overflow-y-auto p-3">
-          <p className={label}>Nodes</p>
-          <div className="space-y-1.5">
-            {nodeTypeInfos.map((info) => (
+          {/* Data */}
+          <div className={sectionClass}>
+            <p className={label}>Data</p>
+            <div className={listGap}>
               <button
-                key={info.type}
                 type="button"
-                onClick={() => handleAddNode(info.type)}
+                onClick={() => setShowImportModal(true)}
                 className={paletteItem}
               >
-                <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
-                <div className="min-w-0 flex-1">
-                  <div className={paletteItemTitle}>{info.label}</div>
-                  <div className={paletteItemDescription}>{info.description}</div>
-                </div>
+                <FileInput size={14} className={paletteItemIcon} />
+                <span className={paletteItemTitle}>Import Python</span>
               </button>
-            ))}
+            </div>
+          </div>
+
+          {/* Nodes */}
+          <div className={sectionClass}>
+            <p className={label}>Nodes</p>
+            <div className={listGap}>
+              {nodeTypeInfos
+                .filter((info) => !AI_NODE_TYPES.has(info.type))
+                .sort((a, b) => a.label.localeCompare(b.label))
+                .map((info) => (
+                  <button
+                    key={info.type}
+                    type="button"
+                    onClick={() => handleAddNode(info.type)}
+                    className={paletteItem}
+                  >
+                    <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className={paletteItemTitle}>{info.label}</div>
+                      <div className={paletteItemDescription}>{info.description}</div>
+                    </div>
+                  </button>
+                ))}
+            </div>
           </div>
         </div>
 
         {/* Footer hint */}
-        <div className={cn(divider, panelSectionHeader)}>
+        <div className={cn(divider, panelSectionHeader, 'border-b-0 border-t-0 py-1.5')}>
           <p className={cn('text-center', captionMuted)}>
             Connect nodes by dragging between handles
           </p>

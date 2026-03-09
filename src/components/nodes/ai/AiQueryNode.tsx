@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { Sparkles } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { type EditNodesResponse } from '@/lib/api';
@@ -100,7 +100,7 @@ export function AiQueryNode({ id, data, selected }: AiQueryNodeProps) {
       nodeId={id}
       state={nodeState}
       title="Query with AI"
-      icon={<Sparkles size={16} />}
+      icon={<Search size={16} />}
       selected={selected}
       inputs={1}
       outputs={0}
