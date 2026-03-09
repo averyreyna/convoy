@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { ReactNode } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Square, CheckSquare } from 'lucide-react';
+import { Square, CheckSquare, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
 import {
@@ -20,7 +20,6 @@ import { ExplanationPopover } from './ExplanationPopover';
 export type NodeState = 'proposed' | 'confirmed' | 'running' | 'error';
 
 interface BaseNodeProps {
-  /** Node id (for inline diff baseline lookup) */
   nodeId?: string;
   state: NodeState;
   title: string;
@@ -29,22 +28,16 @@ interface BaseNodeProps {
   inputs?: number;
   outputs?: number;
   onConfirm?: () => void;
-  /** Node type identifier for AI explanation (e.g. 'filter', 'groupBy') */
   nodeType?: string;
-  /** Node configuration for AI explanation and code generation */
   nodeConfig?: Record<string, unknown>;
-  /** Input row count for AI explanation context */
   inputRowCount?: number;
-  /** Output row count for AI explanation context */
   outputRowCount?: number;
-  /** User's custom code (for inline diff baseline comparison; editing is in pipeline code view) */
   customCode?: string;
-  /** If true, the node uses a wider layout (e.g. for chart rendering). */
   wide?: boolean;
-  /** Execution error message to show when state is 'error' */
   errorMessage?: string;
-  /** Whether the node is selected on the canvas */
   selected?: boolean;
+  /** When true, show a loading indicator (Python/node execution in progress). */
+  isExecuting?: boolean;
 }
 
 export const BaseNode = memo(function BaseNode({
@@ -64,6 +57,7 @@ export const BaseNode = memo(function BaseNode({
   wide,
   errorMessage,
   selected,
+  isExecuting = false,
 }: BaseNodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
@@ -80,16 +74,15 @@ export const BaseNode = memo(function BaseNode({
         wide && card.wide
       )}
     >
-      {/* Input handle */}
       {inputs > 0 && (
         <Handle
+          id="target"
           type="target"
           position={Position.Left}
           className={nodeHandle}
         />
       )}
 
-      {/* Header */}
       <div className={nodeHeader}>
         {nodeId != null ? (
           <button
@@ -119,6 +112,9 @@ export const BaseNode = memo(function BaseNode({
         )}
         <span className={nodeHeaderTitle}>{title}</span>
         <div className="ml-auto flex items-center gap-1">
+          {isExecuting && (
+            <Loader2 size={14} className="animate-spin text-gray-500" aria-label="Running" />
+          )}
           {showExplanation && (
             <ExplanationPopover
               nodeType={nodeType}
@@ -136,7 +132,6 @@ export const BaseNode = memo(function BaseNode({
         </div>
       </div>
 
-      {/* Content: config/simple view only; code editing is in the pipeline code view */}
       <div className="p-3">
         {state === 'error' && errorMessage && (
           <div className={alert}>{errorMessage}</div>
@@ -144,7 +139,6 @@ export const BaseNode = memo(function BaseNode({
         {children}
       </div>
 
-      {/* Confirm button for proposed nodes */}
       {state === 'proposed' && onConfirm && (
         <div className={cn(divider, panelSectionHeader)}>
           <button
@@ -159,9 +153,9 @@ export const BaseNode = memo(function BaseNode({
         </div>
       )}
 
-      {/* Output handle */}
       {outputs > 0 && (
         <Handle
+          id="source"
           type="source"
           position={Position.Right}
           className={nodeHandle}

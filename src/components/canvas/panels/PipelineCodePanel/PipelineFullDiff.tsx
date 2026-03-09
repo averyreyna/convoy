@@ -16,6 +16,8 @@ interface PipelineFullDiffProps {
   fullDiffExpanded: boolean;
   onToggleFullDiff: () => void;
   rows: FullDiffRow[] | null;
+  /** When provided, clicking a line in the "current" column focuses that node/cell. */
+  onLineClick?: (lineNum: number) => void;
 }
 
 export function PipelineFullDiff({
@@ -23,6 +25,7 @@ export function PipelineFullDiff({
   fullDiffExpanded,
   onToggleFullDiff,
   rows,
+  onLineClick,
 }: PipelineFullDiffProps) {
   if (!hasBaseline) return null;
 
@@ -83,24 +86,79 @@ export function PipelineFullDiff({
               After (current)
             </div>
             <div className="overflow-auto p-1.5">
-              {rows.map((row, i) =>
-                row.kind === 'added' ? (
-                  <div
-                    key={`r-${i}`}
-                    className="border-l-2 border-emerald-500 bg-emerald-50 py-0.5 pl-1.5 pr-1 text-emerald-900"
-                  >
-                    {row.text || ' '}
-                  </div>
-                ) : row.kind === 'unchanged' ? (
-                  <div key={`r-${i}`} className="py-0.5 pl-1.5 pr-1 text-gray-700">
-                    {row.text || ' '}
-                  </div>
-                ) : (
-                  <div key={`r-${i}`} className="py-0.5 pl-1.5 pr-1 text-gray-300">
+              {rows.map((row, i) => {
+                const hasRightNum = row.rightNum != null;
+                const isClickable = hasRightNum && onLineClick;
+                const baseClass = 'py-0.5 pl-1.5 pr-1 text-left w-full';
+                const interactiveClass = isClickable
+                  ? 'cursor-pointer hover:bg-gray-100 rounded'
+                  : '';
+                if (row.kind === 'added') {
+                  return (
+                    <div
+                      key={`r-${i}`}
+                      role={isClickable ? 'button' : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      onClick={
+                        isClickable ? () => onLineClick!(row.rightNum!) : undefined
+                      }
+                      onKeyDown={
+                        isClickable
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onLineClick!(row.rightNum!);
+                              }
+                            }
+                          : undefined
+                      }
+                      className={cn(
+                        'border-l-2 border-emerald-500 bg-emerald-50 text-emerald-900',
+                        baseClass,
+                        interactiveClass
+                      )}
+                      title={isClickable ? 'Click to focus this node' : undefined}
+                    >
+                      {row.text || ' '}
+                    </div>
+                  );
+                }
+                if (row.kind === 'unchanged') {
+                  return (
+                    <div
+                      key={`r-${i}`}
+                      role={isClickable ? 'button' : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      onClick={
+                        isClickable ? () => onLineClick!(row.rightNum!) : undefined
+                      }
+                      onKeyDown={
+                        isClickable
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onLineClick!(row.rightNum!);
+                              }
+                            }
+                          : undefined
+                      }
+                      className={cn(
+                        'text-gray-700',
+                        baseClass,
+                        interactiveClass
+                      )}
+                      title={isClickable ? 'Click to focus this node' : undefined}
+                    >
+                      {row.text || ' '}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={`r-${i}`} className={cn('text-gray-300', baseClass)}>
                     {' '}
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           </div>
         </div>

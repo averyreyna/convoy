@@ -28,7 +28,7 @@ export function SortNode({ id, data, selected }: SortNodeProps) {
   );
 
   // Execute the node and get upstream data for column dropdown
-  const { upstreamData } = useNodeExecution(
+  const { upstreamData, isExecuting } = useNodeExecution(
     id,
     'sort',
     config,
@@ -55,6 +55,7 @@ export function SortNode({ id, data, selected }: SortNodeProps) {
       outputRowCount={data.outputRowCount}
       customCode={data.customCode}
       errorMessage={data.error}
+      isExecuting={isExecuting}
     >
       <div className="space-y-2">
         {/* Column selector */}

@@ -14,7 +14,6 @@ import { nodeTypes } from '@/components/nodes';
 import { edgeTypes } from '@/components/edges';
 import { pageBackground } from '@/flank';
 import { CanvasControls } from './CanvasControls';
-import { PipelinePrompt } from '../modals/PipelinePrompt';
 import { ImportFromPythonModal } from '../modals/ImportFromPythonModal';
 import { ProposedPipelineBanner } from '../banners/ProposedPipelineBanner';
 
@@ -22,8 +21,6 @@ export function ConvoyCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
-  const showPrompt = useCanvasStore((s) => s.showPrompt);
-  const setShowPrompt = useCanvasStore((s) => s.setShowPrompt);
   const showImportModal = useCanvasStore((s) => s.showImportModal);
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
 
@@ -84,11 +81,6 @@ export function ConvoyCanvas() {
 
       {/* Proposed pipeline banner */}
       <ProposedPipelineBanner />
-
-      {/* Pipeline prompt modal */}
-      {showPrompt && (
-        <PipelinePrompt onClose={() => setShowPrompt(false)} />
-      )}
 
       {/* Import from Python modal */}
       {showImportModal && (

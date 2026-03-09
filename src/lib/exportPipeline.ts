@@ -41,7 +41,7 @@ export function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
   return sorted.map((id) => nodeMap.get(id)!).filter(Boolean);
 }
 
-const META_NODE_TYPES = ['aiQuery', 'aiAdvisor'] as const;
+const META_NODE_TYPES = ['aiQuery', 'aiAdvisor', 'aiSummarizeData', 'aiDiagnose', 'canvasNote'] as const;
 
 /**
  * Exclude AI/meta nodes (e.g. aiQuery, aiAdvisor) and their edges from the pipeline.
@@ -76,6 +76,15 @@ function getNodeCode(node: Node): { code: string; nodeType: string; label: strin
     return { code: data.customCode, nodeType, label };
   }
 
+  if (
+    nodeType === 'aiCleanData' &&
+    data.generatedCode &&
+    typeof data.generatedCode === 'string' &&
+    data.generatedCode.trim() !== ''
+  ) {
+    return { code: data.generatedCode.trim(), nodeType, label };
+  }
+
   // Build config from data (strip internal fields)
   const config = { ...data };
   delete config.state;
@@ -92,11 +101,22 @@ function getNodeCode(node: Node): { code: string; nodeType: string; label: strin
 
 // ─── Python Export ──────────────────────────────────────────────────────────
 
-export function exportAsPython(nodes: Node[], edges: Edge[]): string {
+export type ExportAsPythonOnSection = (nodeId: string | null, section: string) => void;
+
+export function exportAsPython(
+  nodes: Node[],
+  edges: Edge[],
+  onSection?: ExportAsPythonOnSection
+): string {
   const sorted = topologicalSortPipeline(nodes, edges);
   const sections: string[] = [];
 
-  sections.push(`# Convoy Pipeline — Exported Python
+  function pushSection(nodeId: string | null, section: string) {
+    sections.push(section);
+    onSection?.(nodeId, section);
+  }
+
+  pushSection(null, `# Convoy Pipeline — Exported Python
 # Generated on ${new Date().toISOString()}
 # Run with: python pipeline.py
 
@@ -118,21 +138,21 @@ import pandas as pd
     delete config.inputRowCount;
     delete config.outputRowCount;
 
-    sections.push(`# ─── ${label} (${nodeType}) ${'─'.repeat(Math.max(0, 50 - label.length - nodeType.length))}`);
+    pushSection(node.id, `# ─── ${label} (${nodeType}) ${'─'.repeat(Math.max(0, 50 - label.length - nodeType.length))}`);
 
     if (nodeType === 'dataSource') {
       const fileName = config.fileName as string | undefined;
       if (fileName) {
-        sections.push(`df = pd.read_csv(${JSON.stringify(fileName)})
+        pushSection(node.id, `df = pd.read_csv(${JSON.stringify(fileName)})
 print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
 `);
       } else {
-        sections.push(`# TODO: Replace with your data loading code
+        pushSection(node.id, `# TODO: Replace with your data loading code
 df = pd.DataFrame()
 `);
       }
     } else if (nodeType === 'chart') {
-      sections.push(`import matplotlib.pyplot as plt
+      pushSection(node.id, `import matplotlib.pyplot as plt
 
 `);
       // Generate Python chart code
@@ -140,7 +160,7 @@ df = pd.DataFrame()
       if (xAxis && yAxis) {
         switch (chartType) {
           case 'bar':
-            sections.push(`plt.figure(figsize=(10, 6))
+            pushSection(node.id, `plt.figure(figsize=(10, 6))
 plt.bar(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
@@ -150,7 +170,7 @@ plt.show()
 `);
             break;
           case 'line':
-            sections.push(`plt.figure(figsize=(10, 6))
+            pushSection(node.id, `plt.figure(figsize=(10, 6))
 plt.plot(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
@@ -160,7 +180,7 @@ plt.show()
 `);
             break;
           case 'scatter':
-            sections.push(`plt.figure(figsize=(10, 6))
+            pushSection(node.id, `plt.figure(figsize=(10, 6))
 plt.scatter(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
@@ -170,7 +190,7 @@ plt.show()
 `);
             break;
           case 'pie':
-            sections.push(`plt.figure(figsize=(10, 6))
+            pushSection(node.id, `plt.figure(figsize=(10, 6))
 plt.pie(df["${yAxis}"], labels=df["${xAxis}"], autopct="%1.1f%%")
 plt.title("${yAxis} by ${xAxis}")
 plt.tight_layout()
@@ -178,7 +198,7 @@ plt.show()
 `);
             break;
           default:
-            sections.push(`plt.figure(figsize=(10, 6))
+            pushSection(node.id, `plt.figure(figsize=(10, 6))
 plt.bar(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
@@ -197,49 +217,75 @@ plt.show()
         const fmtVal = isNumeric ? String(numValue) : `"${value}"`;
 
         if (operator === 'contains') {
-          sections.push(`df = df[df["${column}"].str.contains("${value}", case=False, na=False)]`);
+          pushSection(node.id, `df = df[df["${column}"].str.contains("${value}", case=False, na=False)]`);
         } else if (operator === 'startsWith') {
-          sections.push(`df = df[df["${column}"].str.startswith("${value}", na=False)]`);
+          pushSection(node.id, `df = df[df["${column}"].str.startswith("${value}", na=False)]`);
         } else {
-          sections.push(`df = df[df["${column}"] ${opMap[operator as string] || '=='} ${fmtVal}]`);
+          pushSection(node.id, `df = df[df["${column}"] ${opMap[operator as string] || '=='} ${fmtVal}]`);
         }
-        sections.push(`print(f"After filter: {len(df)} rows")\n`);
+        pushSection(node.id, `print(f"After filter: {len(df)} rows")\n`);
       }
     } else if (nodeType === 'groupBy') {
       const { groupByColumn, aggregateColumn, aggregation } = config;
       if (groupByColumn && aggregation) {
         const pandasAgg = aggregation === 'avg' ? 'mean' : aggregation;
         const aggCol = aggregateColumn || groupByColumn;
-        sections.push(`df = df.groupby("${groupByColumn}")["${aggCol}"].${pandasAgg}().reset_index()
+        pushSection(node.id, `df = df.groupby("${groupByColumn}")["${aggCol}"].${pandasAgg}().reset_index()
 print(f"After groupBy: {len(df)} groups")\n`);
       }
     } else if (nodeType === 'sort') {
       const { column, direction } = config;
       if (column) {
         const ascending = direction !== 'desc';
-        sections.push(`df = df.sort_values("${column}", ascending=${ascending ? 'True' : 'False'})
+        pushSection(node.id, `df = df.sort_values("${column}", ascending=${ascending ? 'True' : 'False'})
 print(f"Sorted by ${column}")\n`);
       }
     } else if (nodeType === 'select') {
       const cols = config.columns as string[] | undefined;
       if (cols && cols.length > 0) {
-        sections.push(`df = df[${JSON.stringify(cols)}]
+        pushSection(node.id, `df = df[${JSON.stringify(cols)}]
 print(f"Selected ${cols.length} columns")\n`);
       }
     } else if (nodeType === 'transform') {
-      sections.push(`# Custom transform — translate the custom code below to pandas:
+      pushSection(node.id, `# Custom transform — translate the custom code below to pandas:
 # ${(data.customCode as string || '// no custom code').split('\n').join('\n# ')}
 # TODO: Implement this transform in Python
 `);
+    } else if (nodeType === 'aiCleanData') {
+      const generatedCode = data.generatedCode as string | undefined;
+      if (generatedCode && typeof generatedCode === 'string' && generatedCode.trim() !== '') {
+        pushSection(node.id, generatedCode.trim() + '\n');
+      } else {
+        pushSection(node.id, `# AI Clean Data — run in app to generate code\n`);
+      }
     }
   }
 
-  sections.push(`# ─── Output ─────────────────────────────────────────────────────────────────
+  pushSection(null, `# ─── Output ─────────────────────────────────────────────────────────────────
 print(f"\\nPipeline complete: {len(df)} rows, {len(df.columns)} columns")
 print(df.head())
 `);
 
   return sections.join('\n');
+}
+
+/**
+ * Export pipeline as Python and get a mapping from 1-based line number to node ID.
+ * Used by diff UIs to make lines clickable (focus that node/cell).
+ */
+export function exportAsPythonWithLineMap(
+  nodes: Node[],
+  edges: Edge[]
+): { script: string; getNodeIdForLine: (lineNum: number) => string | null } {
+  const lineToNodeId: (string | null)[] = [];
+  const script = exportAsPython(nodes, edges, (nodeId, section) => {
+    const lineCount = section.split('\n').length;
+    for (let i = 0; i < lineCount; i++) lineToNodeId.push(nodeId);
+  });
+  return {
+    script,
+    getNodeIdForLine: (lineNum: number) => lineToNodeId[lineNum - 1] ?? null,
+  };
 }
 
 /**

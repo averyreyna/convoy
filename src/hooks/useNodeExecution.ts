@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useUpstreamData } from './useUpstreamData';
@@ -67,6 +67,8 @@ function isConfigComplete(
   }
 }
 
+const DEBOUNCE_MS = 400;
+
 /**
  * Hook that manages execution of a transformation node.
  *
@@ -78,7 +80,8 @@ function isConfigComplete(
  * When customCode is provided it takes priority over config-based execution
  * and is run through the Python runner (Pyodide).
  *
- * Stores the result in the data store and updates row counts on the node.
+ * Uses cancellation and run id so only the latest run updates the store;
+ * stale completions are ignored when the user edits again.
  */
 export function useNodeExecution(
   nodeId: string,
@@ -90,15 +93,53 @@ export function useNodeExecution(
   const upstreamData = useUpstreamData(nodeId);
   const setNodeOutput = useDataStore((s) => s.setNodeOutput);
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const pipelineRunInProgress = useCanvasStore((s) => s.pipelineRunInProgress);
 
-  // Track last execution to avoid redundant re-runs
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const lastExecKey = useRef<string>('');
+  const runIdRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [runRequest, setRunRequest] = useState(0);
 
-  const execute = useCallback(async () => {
+  const nodeIdRef = useRef(nodeId);
+  const nodeTypeRef = useRef(nodeType);
+  const configRef = useRef(config);
+  const customCodeRef = useRef(customCode);
+  const isConfirmedRef = useRef(isConfirmed);
+  const upstreamDataRef = useRef(upstreamData);
+  nodeIdRef.current = nodeId;
+  nodeTypeRef.current = nodeType;
+  configRef.current = config;
+  customCodeRef.current = customCode;
+  isConfirmedRef.current = isConfirmed;
+  upstreamDataRef.current = upstreamData;
+
+  const execute = useCallback(() => {
+    setRunRequest((r) => r + 1);
+  }, []);
+
+  useEffect(() => {
     if (!upstreamData || !isConfirmed) return;
+    if (pipelineRunInProgress) return;
 
     // When config is incomplete, pass through upstream data and clear error (no Python run)
     if (!isConfigComplete(nodeType, config, customCode)) {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      if (nodeType === 'transform') {
+        console.log('[Convoy useNodeExecution] transform skipped: config incomplete', {
+          nodeId,
+          hasUpstreamData: !!upstreamData,
+          isConfirmed,
+          customCodeArg: customCode === undefined ? 'undefined' : `"${String(customCode).slice(0, 80)}..."`,
+          configKeys: Object.keys(config),
+          configCustomCode: config.customCode === undefined ? 'undefined' : typeof config.customCode,
+        });
+      }
       setNodeOutput(nodeId, upstreamData);
       updateNode(nodeId, {
         inputRowCount: upstreamData.rows.length,
@@ -106,57 +147,109 @@ export function useNodeExecution(
         state: 'confirmed',
         error: undefined,
       });
+      setError(null);
       return;
     }
 
-    // Create a key from the config + upstream data length + custom code to detect changes
     const execKey = JSON.stringify({
       config,
       customCode,
       inputLen: upstreamData.rows.length,
       inputCols: upstreamData.columns.map((c) => c.name).join(','),
+      runRequest,
     });
 
-    // Skip if nothing changed
     if (execKey === lastExecKey.current) return;
     lastExecKey.current = execKey;
 
-    try {
-      const result: DataFrame = await executeNode(
-        nodeType,
-        upstreamData,
-        config,
-        customCode
-      );
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      const nid = nodeIdRef.current;
+      const ntype = nodeTypeRef.current;
+      const cfg = configRef.current;
+      const code = customCodeRef.current;
+      const up = upstreamDataRef.current;
+      if (!up || !isConfirmedRef.current || useCanvasStore.getState().pipelineRunInProgress) return;
 
-      // Store the output for downstream nodes
-      setNodeOutput(nodeId, result);
+      runIdRef.current += 1;
+      const thisRunId = runIdRef.current;
+      let cancelled = false;
 
-      // Update row counts on the node for display
-      updateNode(nodeId, {
-        inputRowCount: upstreamData.rows.length,
-        outputRowCount: result.rows.length,
-        state: 'confirmed',
-        error: undefined,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Execution failed';
-      updateNode(nodeId, {
-        state: 'error',
-        error: message,
-      });
-    }
-  }, [nodeId, nodeType, config, customCode, isConfirmed, upstreamData, setNodeOutput, updateNode]);
+      setIsExecuting(true);
+      setError(null);
 
-  // Auto-execute when dependencies change
-  useEffect(() => {
-    execute();
-  }, [execute]);
+      if (ntype === 'transform') {
+        console.log('[Convoy useNodeExecution] transform executing', {
+          nodeId: nid,
+          inputRows: up.rows.length,
+          customCodeArg: code === undefined ? 'undefined' : `"${String(code).slice(0, 120)}..."`,
+          configCustomCode: cfg.customCode === undefined ? 'undefined' : `"${String(cfg.customCode).slice(0, 120)}..."`,
+        });
+      }
+
+      (async () => {
+        try {
+          const result: DataFrame = await executeNode(ntype, up, cfg, code);
+
+          if (cancelled || thisRunId !== runIdRef.current) return;
+
+          if (ntype === 'transform') {
+            console.log('[Convoy useNodeExecution] transform success', { nodeId: nid, outputRows: result.rows.length });
+          }
+
+          setNodeOutput(nid, result);
+          updateNode(nid, {
+            inputRowCount: up.rows.length,
+            outputRowCount: result.rows.length,
+            state: 'confirmed',
+            error: undefined,
+          });
+          setError(null);
+        } catch (err) {
+          if (cancelled || thisRunId !== runIdRef.current) return;
+
+          const message = err instanceof Error ? err.message : 'Execution failed';
+          if (ntype === 'transform') {
+            console.log('[Convoy useNodeExecution] transform error', { nodeId: nid, error: message });
+          }
+          setError(message);
+          updateNode(nid, {
+            state: 'error',
+            error: message,
+          });
+        } finally {
+          if (thisRunId === runIdRef.current) {
+            setIsExecuting(false);
+          }
+        }
+      })();
+    }, DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      lastExecKey.current = '';
+    };
+  }, [
+    nodeId,
+    nodeType,
+    config,
+    customCode,
+    isConfirmed,
+    upstreamData,
+    runRequest,
+    pipelineRunInProgress,
+    setNodeOutput,
+    updateNode,
+  ]);
 
   return {
     execute,
     upstreamData,
-    isExecuting: false,
-    error: null as string | null,
+    isExecuting,
+    error,
   };
 }

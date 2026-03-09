@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Panel, useReactFlow } from '@xyflow/react';
-import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Download, GitCompare } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Download, GitCompare, Pin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/stores/canvasStore';
-import { downloadPipelineScript } from '@/lib/exportPipeline';
+import { downloadPipelineScript, exportAsPython } from '@/lib/exportPipeline';
 import {
   button,
   dividerVertical,
@@ -18,6 +18,8 @@ export function CanvasControls() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
+  const setBaselineFromPin = useCanvasStore((s) => s.setBaselineFromPin);
+  const setBaselineForNodeIds = useCanvasStore((s) => s.setBaselineForNodeIds);
   const focusNodeIdForView = useCanvasStore((s) => s.focusNodeIdForView);
   const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
 
@@ -94,6 +96,22 @@ export function CanvasControls() {
               >
                 <GitCompare size={14} className={menuItemIcon} />
                 Code changes
+              </button>
+              <button
+                onClick={() => {
+                  if (hasNodes) {
+                    const script = exportAsPython(nodes, edges);
+                    setBaselineFromPin(script, 'python');
+                    setBaselineForNodeIds(nodes.map((n) => n.id));
+                  }
+                  setShowExportMenu(false);
+                }}
+                disabled={!hasNodes}
+                className={cn(menuItem, !hasNodes && 'cursor-not-allowed text-gray-400')}
+                title="Set current export as baseline (for diff)"
+              >
+                <Pin size={14} className={menuItemIcon} />
+                Pin current as baseline
               </button>
               <button
                 onClick={() => {

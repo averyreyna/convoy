@@ -9,7 +9,6 @@ export { PipelineCodePanel } from './panels/PipelineCodePanel';
 export { PreferencesPanel } from './panels/PreferencesPanel';
 
 // Modals
-export { PipelinePrompt } from './modals/PipelinePrompt';
 export { ImportFromPythonModal } from './modals/ImportFromPythonModal';
 export { ScriptDiffModal } from './modals/ScriptDiffModal';
 

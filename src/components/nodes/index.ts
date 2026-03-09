@@ -12,6 +12,10 @@ import { ComputedColumnNode } from './data/ComputedColumnNode';
 import { ReshapeNode } from './data/ReshapeNode';
 import { AiQueryNode } from './ai/AiQueryNode';
 import { AiAdvisorNode } from './ai/AiAdvisorNode';
+import { AiCleanDataNode } from './ai/AiCleanDataNode';
+import { AiSummarizeDataNode } from './ai/AiSummarizeDataNode';
+import { AiDiagnoseNode } from './ai/AiDiagnoseNode';
+import { CanvasNoteNode } from './core/CanvasNoteNode';
 import { AiCallButton } from './ai/AiCallButton';
 import { AiErrorAlert } from './ai/AiErrorAlert';
 import { AiSuggestionList } from './ai/AiSuggestionList';
@@ -126,7 +130,7 @@ export const NODE_DEFS: Record<NodeType, NodeDef<NodeType>> = {
     component: AiQueryNode,
     label: 'Query with AI',
     description: 'Describe changes in natural language; connect nodes as context',
-    icon: 'sparkles',
+    icon: 'search',
     defaultData: { state: 'confirmed', label: 'Query with AI' },
     inputs: 1,
     outputs: 0,
@@ -139,6 +143,46 @@ export const NODE_DEFS: Record<NodeType, NodeDef<NodeType>> = {
     icon: 'messageCircle',
     defaultData: { state: 'confirmed', label: 'Ask about nodes' },
     inputs: 1,
+    outputs: 0,
+  },
+  aiCleanData: {
+    type: 'aiCleanData',
+    component: AiCleanDataNode,
+    label: 'Clean data with AI',
+    description: 'Describe what to filter or clean in natural language',
+    icon: 'brush',
+    defaultData: { state: 'proposed', label: 'Clean data with AI' },
+    inputs: 1,
+    outputs: 1,
+  },
+  aiSummarizeData: {
+    type: 'aiSummarizeData',
+    component: AiSummarizeDataNode,
+    label: 'Summarize data',
+    description: 'Summarize the connected dataset in plain language; creates a note on the canvas',
+    icon: 'fileText',
+    defaultData: { state: 'confirmed', label: 'Summarize data' },
+    inputs: 1,
+    outputs: 0,
+  },
+  aiDiagnose: {
+    type: 'aiDiagnose',
+    component: AiDiagnoseNode,
+    label: 'Debug',
+    description: 'Diagnose why output is empty or row count changed; creates a note on the canvas',
+    icon: 'bug',
+    defaultData: { state: 'confirmed', label: 'Debug' },
+    inputs: 1,
+    outputs: 0,
+  },
+  canvasNote: {
+    type: 'canvasNote',
+    component: CanvasNoteNode,
+    label: 'Note',
+    description: 'Canvas note (created by insight nodes)',
+    icon: 'stickyNote',
+    defaultData: { state: 'confirmed', label: 'Note', content: '' },
+    inputs: 0,
     outputs: 0,
   },
 };

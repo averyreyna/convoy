@@ -38,7 +38,7 @@ export function FilterNode({ id, data, selected }: FilterNodeProps) {
   );
 
   // Execute the node and get upstream data for column dropdowns
-  const { upstreamData } = useNodeExecution(
+  const { upstreamData, isExecuting } = useNodeExecution(
     id,
     'filter',
     config,
@@ -65,6 +65,7 @@ export function FilterNode({ id, data, selected }: FilterNodeProps) {
       outputRowCount={data.outputRowCount}
       customCode={data.customCode}
       errorMessage={data.error}
+      isExecuting={isExecuting}
     >
       <div className="space-y-2">
         {/* Column selector */}

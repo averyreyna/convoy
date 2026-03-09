@@ -1,6 +1,7 @@
 /**
  * In-browser Python execution via Pyodide.
  * Loads Pyodide once, runs user/generated Python code with pandas, returns DataFrame result.
+ * Execution is serialized through a single-job queue so only one Python run is active at a time.
  */
 
 import { loadPyodide } from 'pyodide';
@@ -17,10 +18,23 @@ function getPyodide(): Promise<PyodideInstance> {
         fullStdLib: false,
       });
       await p.loadPackage('pandas');
+      await p.loadPackage('matplotlib');
       return p;
     })();
   }
   return pyodidePromise;
+}
+
+/** Single-job queue: only one Python run at a time. */
+let queueTail: Promise<void> = Promise.resolve();
+
+function enqueue<T>(job: () => Promise<T>): Promise<T> {
+  const prev = queueTail;
+  let resolveNext: () => void;
+  queueTail = new Promise<void>((r) => {
+    resolveNext = r;
+  });
+  return prev.then(() => job()).finally(() => resolveNext());
 }
 
 /**
@@ -36,6 +50,19 @@ export async function runPythonWithDataFrame(
     return { columns: input.columns, rows: [] };
   }
 
+  return enqueue(() => runPythonWithDataFrameImpl(input, code));
+}
+
+async function runPythonWithDataFrameImpl(
+  input: DataFrame,
+  code: string
+): Promise<DataFrame> {
+  console.log('[Convoy runPythonWithDataFrame]', {
+    inputRows: input.rows.length,
+    inputCols: input.columns.map((c) => c.name),
+    codePreview: code.slice(0, 300),
+  });
+
   const pyodide = await getPyodide();
   if (!pyodide) throw new Error('Pyodide not loaded');
 
@@ -49,31 +76,50 @@ data = json.loads(input_json)
 columns = [c["name"] for c in data["columns"]]
 df = pd.DataFrame(data["rows"], columns=columns)
 exec(user_code)
+# If user assigned to a variable (e.g. df_top5 = df.head(5)) but did not assign to df, use it
+try:
+  for _vname in ("df_top5", "df_result", "result", "out"):
+    if _vname in dir() and hasattr(eval(_vname), "to_dict"):
+      df = eval(_vname)
+      break
+except Exception:
+  pass
 cols = [{"name": c, "type": "string"} for c in df.columns]
 rows = df.to_dict("records")
 _result_ = {"columns": cols, "rows": rows}
 _result_
 `;
 
-  const result = await pyodide.runPythonAsync(runScript);
-  if (result === undefined || result === null) {
-    throw new Error('Python code did not produce a result');
+  try {
+    const result = await pyodide.runPythonAsync(runScript);
+    if (result === undefined || result === null) {
+      throw new Error('Python code did not produce a result');
+    }
+
+    const output = result.toJs({
+      dict_converter: Object.fromEntries,
+      create_proxies: false,
+    }) as { columns: { name: string; type: string }[]; rows: Record<string, unknown>[] };
+
+    console.log('[Convoy runPythonWithDataFrame] success', {
+      outputRows: output.rows.length,
+      outputCols: output.columns.map((c) => c.name),
+    });
+
+    const columns: Column[] = output.columns.map((c) => ({
+      name: c.name,
+      type: (c.type === 'number' || c.type === 'boolean' || c.type === 'date' ? c.type : 'string') as Column['type'],
+    }));
+
+    return {
+      columns,
+      rows: output.rows,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.log('[Convoy runPythonWithDataFrame] error', { message });
+    throw err;
   }
-
-  const output = result.toJs({
-    dict_converter: Object.fromEntries,
-    create_proxies: false,
-  }) as { columns: { name: string; type: string }[]; rows: Record<string, unknown>[] };
-
-  const columns: Column[] = output.columns.map((c) => ({
-    name: c.name,
-    type: (c.type === 'number' || c.type === 'boolean' || c.type === 'date' ? c.type : 'string') as Column['type'],
-  }));
-
-  return {
-    columns,
-    rows: output.rows,
-  };
 }
 
 /**
@@ -83,12 +129,18 @@ _result_
  * is then sent to import-from-Python to propose nodes.
  */
 export async function runFullPipelineScript(script: string): Promise<void> {
+  return enqueue(() => runFullPipelineScriptImpl(script));
+}
+
+async function runFullPipelineScriptImpl(script: string): Promise<void> {
   const pyodide = await getPyodide();
   if (!pyodide) throw new Error('Pyodide not loaded');
 
   pyodide.globals.set('user_script', script);
 
   const runScript = `
+import matplotlib
+matplotlib.use("Agg")
 import pandas as pd
 exec(user_script)
 `;

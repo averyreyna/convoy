@@ -37,7 +37,7 @@ export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
   );
 
   // Execute the node and get upstream data for column dropdowns
-  const { upstreamData } = useNodeExecution(
+  const { upstreamData, isExecuting } = useNodeExecution(
     id,
     'groupBy',
     config,
@@ -72,6 +72,7 @@ export function GroupByNode({ id, data, selected }: GroupByNodeProps) {
       outputRowCount={data.outputRowCount}
       customCode={data.customCode}
       errorMessage={data.error}
+      isExecuting={isExecuting}
     >
       <div className="space-y-2">
         {/* Group by column */}
