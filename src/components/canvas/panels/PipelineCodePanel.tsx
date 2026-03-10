@@ -59,6 +59,7 @@ export function PipelineCodePanel() {
   const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
   const [draftCells, setDraftCells] = useState<Array<{ id: string; code: string }>>([]);
   const [copyFeedback, setCopyFeedback] = useState<'script' | 'jupyter' | null>(null);
+  const [notebookDownloadFeedback, setNotebookDownloadFeedback] = useState(false);
   const [editWithAIOpen, setEditWithAIOpen] = useState(false);
   const [editWithAIPrompt, setEditWithAIPrompt] = useState('');
   const [editWithAILoading, setEditWithAILoading] = useState(false);
@@ -275,6 +276,8 @@ export function PipelineCodePanel() {
 
   const handleDownloadNotebook = useCallback(() => {
     downloadNotebook(nodes, edges);
+    setNotebookDownloadFeedback(true);
+    setTimeout(() => setNotebookDownloadFeedback(false), 4500);
   }, [nodes, edges]);
 
   const handleCopyJupyterCells = useCallback(async () => {
@@ -470,6 +473,12 @@ export function PipelineCodePanel() {
           canDownloadNotebook={nodes.length > 0}
           onDownloadNotebook={handleDownloadNotebook}
           onAddCell={handleAddCell}
+          notebookDownloadFeedback={notebookDownloadFeedback}
+          copyFeedbackMessage={
+            copyFeedback === 'jupyter'
+              ? 'Paste in Jupyter or a .py file (Run Cell with # %%).'
+              : null
+          }
         />
       </div>
 
