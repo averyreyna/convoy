@@ -51,12 +51,12 @@ export function PipelineCodeToolbar({
     notebookDownloadFeedback || (copyFeedbackMessage != null && copyFeedbackMessage !== '');
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-1">
+    <div className="flex w-full shrink-0 flex-col gap-2">
     <div className="flex w-full items-center justify-between gap-4">
       <div className="flex items-center gap-3">
-        <div className="flex flex-col gap-0.5">
+        <div className="flex min-w-[220px] flex-col gap-1">
           <span className={label}>Pipeline code</span>
-          <span className={captionMuted}>
+          <span className={cn(captionMuted, 'leading-relaxed')}>
             Same order as exported notebook. Edit here or download to open in Jupyter.
           </span>
         </div>
@@ -68,7 +68,7 @@ export function PipelineCodeToolbar({
             button.base,
             button.variants.secondary,
             button.sizes.sm,
-            'disabled:opacity-50'
+            'min-h-[26px] shrink-0 whitespace-nowrap disabled:opacity-50'
           )}
           title="Edit selected cells with AI"
         >
@@ -161,7 +161,7 @@ export function PipelineCodeToolbar({
       </div>
     </div>
     {showExportHint && (
-      <p className={captionMuted}>
+      <p className={cn(captionMuted, 'leading-relaxed')}>
         {notebookDownloadFeedback
           ? 'Notebook downloaded. Open the file in Jupyter or VS Code.'
           : copyFeedbackMessage}

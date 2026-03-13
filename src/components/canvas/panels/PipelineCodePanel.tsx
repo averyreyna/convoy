@@ -31,6 +31,8 @@ import { PipelineCodeToolbar } from './PipelineCodePanel/PipelineCodeToolbar';
 import {
   PipelineCellList,
   type PipelineCellViewModel,
+  type CodePipelineCellViewModel,
+  type AiConversationCellViewModel,
 } from './PipelineCodePanel/PipelineCellList';
 import { PipelineFullDiff, type FullDiffRow } from './PipelineCodePanel/PipelineFullDiff';
 
@@ -51,6 +53,8 @@ export function PipelineCodePanel() {
   const setPipelineRunInProgress = useCanvasStore((s) => s.setPipelineRunInProgress);
   const baselineCode = useCanvasStore((s) => s.baselineCode);
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
+  const aiNotebookCells = useCanvasStore((s) => s.aiNotebookCells);
+  const addAiNotebookCell = useCanvasStore((s) => s.addAiNotebookCell);
   const nodeData = useDataStore((s) => s.nodeData);
 
   const [runError, setRunError] = useState<string | null>(null);
@@ -93,9 +97,10 @@ export function PipelineCodePanel() {
     ]);
   }, []);
 
-  const nodeCells: PipelineCellViewModel[] = useMemo(() => {
+  const nodeCells: CodePipelineCellViewModel[] = useMemo(() => {
     const sorted = topologicalSortPipeline(nodes, edges);
-    return sorted.map((node) => {
+    let runIndex = 0;
+    const cells: CodePipelineCellViewModel[] = sorted.map((node) => {
       const data = node.data as Record<string, unknown>;
       const nodeType = (node.type as string) || 'unknown';
       const label = (data.label as string) || nodeType;
@@ -111,24 +116,69 @@ export function PipelineCodePanel() {
         typeof data.customCode === 'string' && data.customCode.trim() !== ''
           ? data.customCode
           : generateNodeCode(nodeType, config);
-      return { nodeId: node.id, nodeType, label, code };
+      const cell: CodePipelineCellViewModel = {
+        kind: 'code',
+        nodeId: node.id,
+        nodeType,
+        label,
+        code,
+        runIndex,
+      };
+      runIndex += 1;
+      return cell;
     });
+    return cells;
   }, [nodes, edges]);
 
-  const cells: PipelineCellViewModel[] = useMemo(() => {
-    const draftAsCells: PipelineCellViewModel[] = draftCells.map((d) => ({
+  const codeCells: CodePipelineCellViewModel[] = useMemo(() => {
+    const startIndex = nodeCells.length;
+    const draftAsCells: CodePipelineCellViewModel[] = draftCells.map((d, idx) => ({
+      kind: 'code',
       nodeId: d.id,
       nodeType: 'transform',
       label: 'New cell',
       code: d.code,
+      runIndex: startIndex + idx,
     }));
     return [...nodeCells, ...draftAsCells];
   }, [nodeCells, draftCells]);
 
-  const fullScript = useMemo(
-    () => (cells.length > 0 ? buildScriptFromCellCodes(cells) : ''),
-    [cells]
+  const aiCells: AiConversationCellViewModel[] = useMemo(() => {
+    if (!aiNotebookCells.length) return [];
+    return aiNotebookCells
+      .slice()
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map((cell) => {
+        const relatedLabels = nodes
+          .filter((n) => cell.nodeIds.includes(n.id))
+          .map((n) => {
+            const data = n.data as { label?: string } | undefined;
+            return data?.label || (n.type as string) || n.id;
+          });
+        const label =
+          relatedLabels.length > 0
+            ? `AI advice for ${relatedLabels.join(', ')}`
+            : 'AI advice';
+        return {
+          kind: 'aiConversation' as const,
+          id: cell.id,
+          label,
+          question: cell.question,
+          answer: cell.answer,
+        };
+      });
+  }, [aiNotebookCells, nodes]);
+
+  const cells: PipelineCellViewModel[] = useMemo(
+    () => [...codeCells, ...aiCells],
+    [codeCells, aiCells]
   );
+
+  const fullScript = useMemo(() => {
+    if (codeCells.length === 0) return '';
+    const cellCodes = codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType }));
+    return buildScriptFromCellCodes(cellCodes);
+  }, [codeCells]);
 
   const dataSourceColumnNames = useMemo(() => {
     const sorted = topologicalSortPipeline(nodes, edges);
@@ -194,26 +244,28 @@ export function PipelineCodePanel() {
   );
 
   const handleRunAll = useCallback(() => {
-    if (cells.length === 0) return;
-    const scriptForImport = buildScriptFromCellCodes(cells);
-    const scriptForRun = buildScriptForBrowserRun(cells, undefined, dataSourceColumnNames);
+    if (codeCells.length === 0) return;
+    const cellCodes = codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType }));
+    const scriptForImport = buildScriptFromCellCodes(cellCodes);
+    const scriptForRun = buildScriptForBrowserRun(cellCodes, undefined, dataSourceColumnNames);
     runScriptAndImport(scriptForImport, scriptForRun, {
       clearDraftsOnSuccess: draftCells.length > 0,
       nodeIdsForBaseline: nodeCells.map((c) => c.nodeId),
     });
-  }, [cells, dataSourceColumnNames, runScriptAndImport, draftCells.length, nodeCells]);
+  }, [codeCells, dataSourceColumnNames, runScriptAndImport, draftCells.length, nodeCells]);
 
   const handleRunCell = useCallback(
-    (cellIndex: number) => {
-      const scriptForImport = buildScriptFromCellCodes(cells, cellIndex);
-      const scriptForRun = buildScriptForBrowserRun(cells, cellIndex, dataSourceColumnNames);
-      const runIncludesDrafts = cellIndex >= nodeCells.length;
+    (runIndex: number) => {
+      const cellCodes = codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType }));
+      const scriptForImport = buildScriptFromCellCodes(cellCodes, runIndex);
+      const scriptForRun = buildScriptForBrowserRun(cellCodes, runIndex, dataSourceColumnNames);
+      const runIncludesDrafts = runIndex >= nodeCells.length;
       runScriptAndImport(scriptForImport, scriptForRun, {
-        upToIndex: runIncludesDrafts ? undefined : cellIndex,
+        upToIndex: runIncludesDrafts ? undefined : runIndex,
         clearDraftsOnSuccess: runIncludesDrafts,
       });
     },
-    [cells, nodeCells.length, dataSourceColumnNames, runScriptAndImport]
+    [codeCells, nodeCells.length, dataSourceColumnNames, runScriptAndImport]
   );
 
   const handleCellChange = useCallback(
@@ -334,6 +386,14 @@ export function PipelineCodePanel() {
         setEditWithAIError('AI returned no changes. Try a more specific prompt.');
         return;
       }
+      addAiNotebookCell({
+        source: 'editNodes',
+        nodeIds: selectedNodeIdsArray,
+        question: editWithAIPrompt.trim(),
+        answer:
+          res.explanation ??
+          'Applied AI edit to the selected nodes.',
+      });
       const nodeIdsToReplace = selectedNodeIdsArray.filter(
         (nid) => nodes.find((n) => n.id === nid)?.type !== 'dataSource'
       );
@@ -364,6 +424,7 @@ export function PipelineCodePanel() {
     edges,
     dataSchemaForEdit,
     replaceNodesWithSuggestedPipeline,
+    addAiNotebookCell,
   ]);
 
   const { script: currentExportForDiff, getNodeIdForLine } = useMemo(() => {
@@ -454,7 +515,7 @@ export function PipelineCodePanel() {
 
   return (
     <div className="flex h-full flex-col border-l border-gray-200 bg-white">
-      <div className={cn(panelSection, 'flex shrink-0 items-center justify-between')}>
+      <div className={cn(panelSection, 'flex shrink-0 items-center justify-between py-2')}>
         <PipelineCodeToolbar
           canEditWithAI={selectedNodeIdsArray.length > 0}
           onToggleEditWithAI={() => setEditWithAIOpen((v) => !v)}
@@ -466,9 +527,9 @@ export function PipelineCodePanel() {
           canCopyScript={!!fullScript}
           copyFeedback={copyFeedback}
           onCopyScript={handleCopy}
-          canCopyJupyter={cells.length > 0}
+          canCopyJupyter={codeCells.length > 0}
           onCopyJupyter={handleCopyJupyterCells}
-          canDownloadPy={cells.length > 0}
+          canDownloadPy={codeCells.length > 0}
           onDownloadPy={handleDownloadPy}
           canDownloadNotebook={nodes.length > 0}
           onDownloadNotebook={handleDownloadNotebook}
@@ -519,9 +580,11 @@ export function PipelineCodePanel() {
 
       <div className={cn(notebookScrollArea)}>
         {cells.length === 0 ? (
-          <p className={captionMuted}>
-            Add nodes to see pipeline code, or use + to add a new cell.
-          </p>
+          <div className="flex min-h-[120px] flex-col justify-center px-1">
+            <p className={cn(captionMuted, 'leading-relaxed')}>
+              Add nodes to see pipeline code, or use + to add a new cell.
+            </p>
+          </div>
         ) : (
           <PipelineCellList
             cells={cells}

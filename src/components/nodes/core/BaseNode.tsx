@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { Square, CheckSquare, Loader2 } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
   divider,
 } from '@/flank';
 import { ExplanationPopover } from './ExplanationPopover';
+import { computeNodeDetailMode, type NodeDetailMode } from './nodeDetailMode';
 
 export type NodeState = 'proposed' | 'confirmed' | 'running' | 'error';
 
@@ -38,6 +39,8 @@ interface BaseNodeProps {
   selected?: boolean;
   /** When true, show a loading indicator (Python/node execution in progress). */
   isExecuting?: boolean;
+  /** Override zoom-driven behavior when provided. */
+  detailMode?: NodeDetailMode;
 }
 
 export const BaseNode = memo(function BaseNode({
@@ -58,9 +61,19 @@ export const BaseNode = memo(function BaseNode({
   errorMessage,
   selected,
   isExecuting = false,
+  detailMode,
 }: BaseNodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
+  const zoom = useCanvasStore((s) => s.viewport.zoom);
+
+  const detailModeRef = useRef<NodeDetailMode>('full');
+  const effectiveDetailMode = useMemo<NodeDetailMode>(() => {
+    if (detailMode) return detailMode;
+    const next = computeNodeDetailMode(zoom, detailModeRef.current);
+    detailModeRef.current = next;
+    return next;
+  }, [detailMode, zoom]);
 
   const showExplanation = state === 'confirmed' && nodeType && nodeConfig;
 
@@ -132,26 +145,35 @@ export const BaseNode = memo(function BaseNode({
         </div>
       </div>
 
-      <div className="p-3">
-        {state === 'error' && errorMessage && (
-          <div className={alert}>{errorMessage}</div>
-        )}
-        {children}
-      </div>
-
-      {state === 'proposed' && onConfirm && (
-        <div className={cn(divider, panelSectionHeader)}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onConfirm();
-            }}
-            className={cn(button.base, button.variants.primary, button.sizes.md, button.fullWidth)}
-          >
-            Click to confirm
-          </button>
+      {effectiveDetailMode === 'full' && (
+        <div className="p-3">
+          {state === 'error' && errorMessage && (
+            <div className={alert}>{errorMessage}</div>
+          )}
+          {children}
         </div>
       )}
+
+      {effectiveDetailMode === 'full' &&
+        state === 'proposed' &&
+        onConfirm && (
+          <div className={cn(divider, panelSectionHeader)}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onConfirm();
+              }}
+              className={cn(
+                button.base,
+                button.variants.primary,
+                button.sizes.md,
+                button.fullWidth
+              )}
+            >
+              Click to confirm
+            </button>
+          </div>
+        )}
 
       {outputs > 0 && (
         <Handle

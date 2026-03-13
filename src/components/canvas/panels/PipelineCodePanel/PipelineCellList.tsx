@@ -40,12 +40,27 @@ const EDITOR_OPTIONS = {
   },
 } as const;
 
-export interface PipelineCellViewModel {
+export type PipelineCellKind = 'code' | 'aiConversation';
+
+export interface CodePipelineCellViewModel {
+  kind: 'code';
   nodeId: string;
   nodeType: string;
   label: string;
   code: string;
+  /** Index into the ordered list of runnable code cells (for Run cell / Run all). */
+  runIndex: number;
 }
+
+export interface AiConversationCellViewModel {
+  kind: 'aiConversation';
+  id: string;
+  label: string;
+  question: string;
+  answer: string;
+}
+
+export type PipelineCellViewModel = CodePipelineCellViewModel | AiConversationCellViewModel;
 
 interface BaselineSnapshot {
   config: Record<string, unknown>;
@@ -94,6 +109,39 @@ export function PipelineCellList({
   return (
     <div className={notebookCellList}>
       {cells.map((cell, index) => {
+        if (cell.kind === 'aiConversation') {
+          return (
+            <div
+              key={cell.id}
+              className={cn(
+                notebookCell,
+                'border-blue-50 bg-blue-50/40'
+              )}
+            >
+              <div className={notebookCellGutter}>
+                <span className={notebookCellPrompt}>In [{index + 1}]:</span>
+              </div>
+              <div className={notebookCellContent}>
+                <div className={notebookCellHeader}>
+                  <span className={label}>{cell.label}</span>
+                </div>
+                <div className="space-y-2 rounded-b-md border-0 border-gray-200 bg-white px-3 py-2 text-xs leading-relaxed text-gray-800">
+                  {cell.question && (
+                    <div>
+                      <div className={cn(caption, 'mb-0.5 text-gray-500')}>Question</div>
+                      <p className="whitespace-pre-wrap">{cell.question}</p>
+                    </div>
+                  )}
+                  <div>
+                    <div className={cn(caption, 'mb-0.5 text-gray-500')}>Answer</div>
+                    <p className="whitespace-pre-wrap">{cell.answer}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
         const isNodeBacked = !cell.nodeId.startsWith('draft-');
         const isSelected = isNodeBacked && selectedNodeIds.has(cell.nodeId);
         const isFocused = focusedCellNodeId === cell.nodeId;
@@ -153,7 +201,7 @@ export function PipelineCellList({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRunCell(index);
+                  onRunCell(cell.runIndex);
                 }}
                 disabled={isRunning}
                 className={cn(

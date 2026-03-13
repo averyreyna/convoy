@@ -24,6 +24,8 @@ export function ConvoyCanvas() {
   const showImportModal = useCanvasStore((s) => s.showImportModal);
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
 
+  const setViewport = useCanvasStore((s) => s.setViewport);
+
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -34,6 +36,13 @@ export function ConvoyCanvas() {
     reactFlowInstance.current = instance;
   }, []);
 
+  const handleMoveEnd = useCallback(
+    (_: unknown, viewport: { x: number; y: number; zoom: number }) => {
+      setViewport(viewport);
+    },
+    [setViewport]
+  );
+
   return (
     <div ref={reactFlowWrapper} className="relative h-full w-full">
       <ReactFlow
@@ -43,6 +52,7 @@ export function ConvoyCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onInit={onInit}
+        onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{

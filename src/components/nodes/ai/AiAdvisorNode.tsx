@@ -9,6 +9,7 @@ import { button, input, caption } from '@/flank';
 import { useNodeContext, useDataSourceSchema, usePipelineContext, useNodeUpdate } from '../hooks';
 import { AiCallButton } from './AiCallButton';
 import { AiErrorAlert } from './AiErrorAlert';
+import { useCanvasStore } from '@/stores/canvasStore';
 
 type AiAdvisorNodeProps = NodeProps & {
   data: AiAdvisorNodeData;
@@ -16,6 +17,7 @@ type AiAdvisorNodeProps = NodeProps & {
 
 export function AiAdvisorNode({ id, data, selected }: AiAdvisorNodeProps) {
   const updateNode = useNodeUpdate<AiAdvisorNodeData>(id);
+  const addAiNotebookCell = useCanvasStore((s) => s.addAiNotebookCell);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,13 +50,19 @@ export function AiAdvisorNode({ id, data, selected }: AiAdvisorNodeProps) {
         pipelineContext,
       });
       updateNode({ answer: res.answer });
+      addAiNotebookCell({
+        source: 'aiAdvisor',
+        nodeIds: contextNodeIds,
+        question: question.trim(),
+        answer: res.answer,
+      });
     } catch (err) {
       console.error('Answer about nodes failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to get advice. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [question, contextNodeIds, dataSchema, pipelineContext, updateNode]);
+  }, [question, contextNodeIds, dataSchema, pipelineContext, updateNode, addAiNotebookCell]);
 
   const handleClearAnswer = useCallback(() => {
     updateNode({ answer: undefined });

@@ -69,20 +69,9 @@ function isConfigComplete(
 
 const DEBOUNCE_MS = 400;
 
-/**
- * Hook that manages execution of a transformation node.
- *
- * Automatically executes the node when:
- * - The node is confirmed
- * - Upstream data is available
- * - The node config or custom code changes
- *
- * When customCode is provided it takes priority over config-based execution
- * and is run through the Python runner (Pyodide).
- *
- * Uses cancellation and run id so only the latest run updates the store;
- * stale completions are ignored when the user edits again.
- */
+// hook that manages execution of a transformation node
+// uses cancellation and run id so only the latest run updates the store
+// stale completions are ignored when the user edits again.
 export function useNodeExecution(
   nodeId: string,
   nodeType: string,
@@ -94,6 +83,7 @@ export function useNodeExecution(
   const setNodeOutput = useDataStore((s) => s.setNodeOutput);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const pipelineRunInProgress = useCanvasStore((s) => s.pipelineRunInProgress);
+  const executionDebounceBypassUntil = useCanvasStore((s) => s.executionDebounceBypassUntil);
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +114,7 @@ export function useNodeExecution(
     if (!upstreamData || !isConfirmed) return;
     if (pipelineRunInProgress) return;
 
-    // When config is incomplete, pass through upstream data and clear error (no Python run)
+    // when config is incomplete, pass through upstream data and clear error (no Python run)
     if (!isConfigComplete(nodeType, config, customCode)) {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
@@ -162,6 +152,7 @@ export function useNodeExecution(
     if (execKey === lastExecKey.current) return;
     lastExecKey.current = execKey;
 
+    const debounceMs = executionDebounceBypassUntil > Date.now() ? 0 : DEBOUNCE_MS;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
@@ -178,6 +169,11 @@ export function useNodeExecution(
 
       setIsExecuting(true);
       setError(null);
+
+      updateNode(nid, {
+        state: 'running',
+        error: undefined,
+      });
 
       if (ntype === 'transform') {
         console.log('[Convoy useNodeExecution] transform executing', {
@@ -224,14 +220,15 @@ export function useNodeExecution(
           }
         }
       })();
-    }, DEBOUNCE_MS);
+    }, debounceMs);
 
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      lastExecKey.current = '';
+      // Intentionally do not reset lastExecKey here so we don't
+      // re-run execution on harmless re-renders with the same inputs.
     };
   }, [
     nodeId,
@@ -242,6 +239,7 @@ export function useNodeExecution(
     upstreamData,
     runRequest,
     pipelineRunInProgress,
+    executionDebounceBypassUntil,
     setNodeOutput,
     updateNode,
   ]);

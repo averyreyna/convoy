@@ -9,7 +9,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react';
-import type { ProposedPipeline, SuggestedPipelineNode } from '@/types';
+import type { EdgeStatus, ProposedPipeline, SuggestedPipelineNode } from '@/types';
 import { topologicalSortPipeline } from '@/lib/exportPipeline';
 import { usePreferencesStore } from './preferencesStore';
 
@@ -20,9 +20,26 @@ export interface ApplyImportOptions {
 
 export type BaselineLanguage = 'python';
 
+export interface AiNotebookCell {
+  id: string;
+  createdAt: number;
+  source: 'editNodes' | 'aiAdvisor';
+  nodeIds: string[];
+  question: string;
+  answer: string;
+}
+
 interface CanvasStore {
   nodes: Node[];
   edges: Edge[];
+
+  // Canvas viewport (for zoom-driven behaviors like detail mode)
+  viewport: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
+  setViewport: (viewport: { x: number; y: number; zoom: number }) => void;
 
   showImportModal: boolean;
   setShowImportModal: (show: boolean) => void;
@@ -40,6 +57,16 @@ interface CanvasStore {
   setBaselineForNodeIds: (nodeIds: string[]) => void;
   clearNodeBaseline: (nodeId: string) => void;
   clearAllNodeBaselines: () => void;
+
+  // Notebook-style AI conversation cells shown alongside pipeline code
+  aiNotebookCells: AiNotebookCell[];
+  addAiNotebookCell: (input: {
+    source: AiNotebookCell['source'];
+    nodeIds: string[];
+    question: string;
+    answer: string;
+  }) => void;
+  clearAiNotebookCells: () => void;
 
   // Node operations
   addNode: (node: Node) => void;
@@ -70,15 +97,83 @@ interface CanvasStore {
   pipelineRunInProgress: boolean;
   setPipelineRunInProgress: (value: boolean) => void;
 
+  // When > 0, treat as timestamp until which execution uses no debounce (e.g. after AI apply)
+  executionDebounceBypassUntil: number;
+
   // React Flow callbacks
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
 }
 
+function computeEdgeStatusForNodes(
+  nodes: Node[],
+  edge: Edge
+): { status: EdgeStatus; animated: boolean; style: Edge['style'] } {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const source = nodeMap.get(edge.source);
+  const target = nodeMap.get(edge.target);
+
+  const sourceState = (source?.data as { state?: string } | undefined)?.state;
+  const targetState = (target?.data as { state?: string } | undefined)?.state;
+
+  let status: EdgeStatus = 'confirmed';
+
+  if (sourceState === 'error' || targetState === 'error') {
+    status = 'error';
+  } else if (sourceState === 'running' || targetState === 'running') {
+    status = 'running';
+  } else if (sourceState === 'proposed' && targetState === 'proposed') {
+    status = 'proposed';
+  } else {
+    status = 'confirmed';
+  }
+
+  let animated = false;
+  let style: Edge['style'] = edge.style ?? {};
+
+  switch (status) {
+    case 'running':
+      animated = true;
+      break;
+    case 'proposed':
+      animated = true;
+      style = { ...style, opacity: style?.opacity ?? 0.5 };
+      break;
+    case 'error':
+      animated = false;
+      break;
+    case 'confirmed':
+    default:
+      animated = false;
+      break;
+  }
+
+  return { status, animated, style };
+}
+
+function recomputeEdgeStatuses(nodes: Node[], edges: Edge[]): Edge[] {
+  return edges.map((edge) => {
+    const { status, animated, style } = computeEdgeStatusForNodes(nodes, edge);
+    return {
+      ...edge,
+      animated,
+      style,
+      data: { ...(edge.data as Record<string, unknown> | undefined), status },
+    };
+  });
+}
+
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: [],
   edges: [],
+
+  viewport: {
+    x: 0,
+    y: 0,
+    zoom: 0.85,
+  },
+  setViewport: (viewport) => set({ viewport }),
 
   showImportModal: false,
   setShowImportModal: (show) => set({ showImportModal: show }),
@@ -135,19 +230,38 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }),
   clearAllNodeBaselines: () => set({ baselineByNodeId: {} }),
 
+  aiNotebookCells: [],
+  addAiNotebookCell: (input) =>
+    set((state) => {
+      const cell: AiNotebookCell = {
+        id: `ai-notebook-${Date.now()}-${state.aiNotebookCells.length}`,
+        createdAt: Date.now(),
+        source: input.source,
+        nodeIds: input.nodeIds,
+        question: input.question,
+        answer: input.answer,
+      };
+      return { aiNotebookCells: [...state.aiNotebookCells, cell] };
+    }),
+  clearAiNotebookCells: () => set({ aiNotebookCells: [] }),
+
   addNode: (node) =>
-    set((state) => ({
-      nodes: [...state.nodes, node],
-    })),
+    set((state) => {
+      const nodes = [...state.nodes, node];
+      const edges = recomputeEdgeStatuses(nodes, state.edges);
+      return { nodes, edges };
+    }),
 
   updateNode: (id, data) =>
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
+    set((state) => {
+      const nodes = state.nodes.map((node) =>
         node.id === id
           ? { ...node, data: { ...node.data, ...data } }
           : node
-      ),
-    })),
+      );
+      const edges = recomputeEdgeStatuses(nodes, state.edges);
+      return { nodes, edges };
+    }),
 
   removeNode: (id) =>
     set((state) => {
@@ -162,24 +276,21 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }),
 
   confirmNode: (id) =>
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
+    set((state) => {
+      const nodes = state.nodes.map((node) =>
         node.id === id
           ? { ...node, data: { ...node.data, state: 'confirmed' } }
           : node
-      ),
-      // Also make edges connected to this node solid
-      edges: state.edges.map((edge) =>
-        edge.source === id || edge.target === id
-          ? { ...edge, animated: true, style: {} }
-          : edge
-      ),
-    })),
+      );
+      const edges = recomputeEdgeStatuses(nodes, state.edges);
+      return { nodes, edges };
+    }),
 
   addEdgeToStore: (edge) =>
-    set((state) => ({
-      edges: [...state.edges, edge],
-    })),
+    set((state) => {
+      const edges = recomputeEdgeStatuses(state.nodes, [...state.edges, edge]);
+      return { edges };
+    }),
 
   removeEdge: (id) =>
     set((state) => ({
@@ -233,9 +344,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       xOffset += 320;
     });
 
+    const nodes = [...existingNodes, ...newNodes];
+    const edges = recomputeEdgeStatuses(nodes, [...existingEdges, ...newEdges]);
+
     set({
-      nodes: [...existingNodes, ...newNodes],
-      edges: [...existingEdges, ...newEdges],
+      nodes,
+      edges,
     });
   },
 
@@ -323,9 +437,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       xOffset += 320;
     });
 
+    const nodes = [...existingNodes, ...newNodes];
+    const edges = recomputeEdgeStatuses(nodes, [...existingEdges, ...newEdges]);
+
     set({
-      nodes: [...existingNodes, ...newNodes],
-      edges: [...existingEdges, ...newEdges],
+      nodes,
+      edges,
     });
   },
 
@@ -409,12 +526,16 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         xOffset += 320;
       });
 
+      const nodes = [...updatedNodes, ...appendNodes];
+      const edges = recomputeEdgeStatuses(nodes, [...existingEdges, ...appendEdges]);
+
       set({
-        nodes: [...updatedNodes, ...appendNodes],
-        edges: [...existingEdges, ...appendEdges],
+        nodes,
+        edges,
       });
     } else {
-      set({ nodes: updatedNodes });
+      const edges = recomputeEdgeStatuses(updatedNodes, existingEdges);
+      set({ nodes: updatedNodes, edges });
     }
   },
 
@@ -524,25 +645,26 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }
     }
 
+    const nodes = [...nodesAfterRemoval, ...newNodes];
+    const edges = recomputeEdgeStatuses(nodes, [...edgesAfterRemoval, ...newEdges]);
+
     set({
-      nodes: [...nodesAfterRemoval, ...newNodes],
-      edges: [...edgesAfterRemoval, ...newEdges],
+      nodes,
+      edges,
+      executionDebounceBypassUntil: Date.now() + 2000,
     });
   },
 
   confirmAllProposed: () =>
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
+    set((state) => {
+      const nodes = state.nodes.map((node) =>
         node.data.state === 'proposed'
           ? { ...node, data: { ...node.data, state: 'confirmed' } }
           : node
-      ),
-      edges: state.edges.map((edge) => ({
-        ...edge,
-        style: {},
-        animated: true,
-      })),
-    })),
+      );
+      const edges = recomputeEdgeStatuses(nodes, state.edges);
+      return { nodes, edges };
+    }),
 
   clearProposed: () =>
     set((state) => {
@@ -572,6 +694,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   pipelineRunInProgress: false,
   setPipelineRunInProgress: (value) => set({ pipelineRunInProgress: value }),
+
+  executionDebounceBypassUntil: 0,
 
   onNodesChange: (changes) =>
     set((state) => ({
