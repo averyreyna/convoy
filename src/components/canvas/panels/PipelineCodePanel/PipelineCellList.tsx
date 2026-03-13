@@ -75,7 +75,7 @@ interface PipelineCellListProps {
   focusedCellNodeId: string | null;
   isRunning: boolean;
   expandedDiffCellIds: Set<string>;
-  onCellClick: (event: React.MouseEvent, cell: { nodeId: string }, index: number) => void;
+  onCellClick: (event: React.MouseEvent, cell: PipelineCellViewModel, index: number) => void;
   onRunCell: (index: number) => void;
   onToggleCellDiff: (nodeId: string) => void;
   onActivateCell: (nodeId: string) => void;

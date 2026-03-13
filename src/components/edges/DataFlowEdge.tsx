@@ -57,14 +57,6 @@ export function DataFlowEdge({
 }: EdgeProps) {
   const status = (data as { status?: EdgeStatus } | undefined)?.status;
   const baseStyle = getEdgeStyleForStatus(status);
-  const statusLabel =
-    status === 'running'
-      ? 'Running'
-      : status === 'error'
-        ? 'Error'
-        : status === 'proposed'
-          ? 'Proposed'
-          : 'Confirmed';
 
   const [edgePath] = getSmoothStepPath({
     sourceX,
@@ -83,7 +75,6 @@ export function DataFlowEdge({
         status ? ` data-flow-edge--${status}` : ''
       }`}
       data-status={status}
-      title={`${statusLabel} edge`}
       path={edgePath}
       markerEnd={markerEnd}
       style={{

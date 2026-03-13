@@ -313,7 +313,8 @@ export function PipelineCodePanel() {
 
   const handleDownloadPy = useCallback(() => {
     if (draftCells.length > 0) {
-      const script = buildScriptFromCellCodes(cells);
+      const cellCodes = codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType }));
+      const script = buildScriptFromCellCodes(cellCodes);
       const blob = new Blob([script], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -324,7 +325,7 @@ export function PipelineCodePanel() {
     } else {
       downloadPipelineScript(nodes, edges);
     }
-  }, [cells, draftCells.length, nodes, edges]);
+  }, [codeCells, draftCells.length, nodes, edges]);
 
   const handleDownloadNotebook = useCallback(() => {
     downloadNotebook(nodes, edges);
@@ -335,7 +336,7 @@ export function PipelineCodePanel() {
   const handleCopyJupyterCells = useCallback(async () => {
     const text =
       draftCells.length > 0
-        ? cells
+        ? codeCells
             .map(
               (c, i) =>
                 `${i === 0 ? '# %%\nimport pandas as pd\n\n' : ''}# %% ${c.label}\n${c.code}\n`
@@ -350,7 +351,7 @@ export function PipelineCodePanel() {
     } catch {
       // ignore
     }
-  }, [cells, draftCells.length, nodes, edges]);
+  }, [codeCells, draftCells.length, nodes, edges]);
 
   const selectedNodeIds = useMemo(
     () => new Set(nodes.filter((n) => n.selected).map((n) => n.id)),
@@ -472,10 +473,12 @@ export function PipelineCodePanel() {
   }, [baselineCode, currentExportForDiff]);
 
   const handleCellClick = useCallback(
-    (e: React.MouseEvent, cell: { nodeId: string }, index: number) => {
-      const isDraft = cell.nodeId.startsWith('draft-');
+    (e: React.MouseEvent, cell: PipelineCellViewModel, index: number) => {
+      if (cell.kind === 'aiConversation') return;
+      const nodeId = cell.nodeId;
+      const isDraft = nodeId.startsWith('draft-');
       if (isDraft) {
-        activateCell(cell.nodeId);
+        activateCell(nodeId);
         return;
       }
       const shift = e.shiftKey;
@@ -486,22 +489,23 @@ export function PipelineCodePanel() {
         const hi = Math.max(anchor, index);
         const nodeIdsInRange = cells
           .slice(lo, hi + 1)
+          .filter((c): c is CodePipelineCellViewModel => c.kind === 'code')
           .filter((c) => !c.nodeId.startsWith('draft-'))
           .map((c) => c.nodeId);
         setSelectedNodeIds(nodeIdsInRange);
         setSelectionAnchorIndex(anchor);
-        activateCell(cell.nodeId);
+        activateCell(nodeId);
       } else if (meta) {
         const next = new Set(selectedNodeIds);
-        if (next.has(cell.nodeId)) next.delete(cell.nodeId);
-        else next.add(cell.nodeId);
+        if (next.has(nodeId)) next.delete(nodeId);
+        else next.add(nodeId);
         setSelectedNodeIds(Array.from(next));
         setSelectionAnchorIndex(index);
-        activateCell(cell.nodeId);
+        activateCell(nodeId);
       } else {
-        setSelectedNodeIds([cell.nodeId]);
+        setSelectedNodeIds([nodeId]);
         setSelectionAnchorIndex(index);
-        activateCell(cell.nodeId);
+        activateCell(nodeId);
       }
     },
     [
