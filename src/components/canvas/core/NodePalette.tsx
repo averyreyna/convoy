@@ -34,6 +34,8 @@ import {
 const AI_NODE_TYPES = new Set(['aiQuery', 'aiAdvisor', 'aiCleanData', 'aiSummarizeData', 'aiDiagnose']);
 const PALETTE_HIDDEN_TYPES = new Set(['canvasNote']);
 
+export type PaletteCategory = 'ai' | 'data' | 'nodes';
+
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
   filter: <Filter size={16} />,
@@ -51,7 +53,7 @@ const iconMap: Record<string, React.ReactNode> = {
   bug: <Bug size={16} />,
 };
 
-export function NodePalette() {
+export function NodePalette({ category }: { category: PaletteCategory }) {
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
@@ -78,69 +80,81 @@ export function NodePalette() {
   const sectionClass = cn(panelSection, 'border-b-0 py-1.5');
   const listGap = 'flex flex-col gap-0.5 mt-0.5';
 
+  const renderSection = () => {
+    if (category === 'ai') {
+      return (
+        <div className={sectionClass}>
+          <p className={label}>AI</p>
+          <div className={listGap}>
+            {nodeTypeInfos
+              .filter((info) => AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
+              .sort((a, b) => a.label.localeCompare(b.label))
+              .map((info) => (
+                <button
+                  key={info.type}
+                  type="button"
+                  onClick={() => handleAddNode(info.type)}
+                  className={paletteItem}
+                >
+                  <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className={paletteItemTitle}>{info.label}</div>
+                    <div className={paletteItemDescription}>{info.description}</div>
+                  </div>
+                </button>
+              ))}
+          </div>
+        </div>
+      );
+    }
+    if (category === 'data') {
+      return (
+        <div className={sectionClass}>
+          <p className={label}>Data</p>
+          <div className={listGap}>
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className={paletteItem}
+            >
+              <FileInput size={14} className={paletteItemIcon} />
+              <span className={paletteItemTitle}>Import Python</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className={sectionClass}>
+        <p className={label}>Nodes</p>
+        <div className={listGap}>
+          {nodeTypeInfos
+            .filter((info) => !AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
+            .sort((a, b) => a.label.localeCompare(b.label))
+            .map((info) => (
+              <button
+                key={info.type}
+                type="button"
+                onClick={() => handleAddNode(info.type)}
+                className={paletteItem}
+              >
+                <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
+                <div className="min-w-0 flex-1">
+                  <div className={paletteItemTitle}>{info.label}</div>
+                  <div className={paletteItemDescription}>{info.description}</div>
+                </div>
+              </button>
+            ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
-          <div className={sectionClass}>
-            <p className={label}>AI</p>
-            <div className={listGap}>
-              {nodeTypeInfos
-                .filter((info) => AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
-                .sort((a, b) => a.label.localeCompare(b.label))
-                .map((info) => (
-                  <button
-                    key={info.type}
-                    type="button"
-                    onClick={() => handleAddNode(info.type)}
-                    className={paletteItem}
-                  >
-                    <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className={paletteItemTitle}>{info.label}</div>
-                      <div className={paletteItemDescription}>{info.description}</div>
-                    </div>
-                  </button>
-                ))}
-            </div>
-          </div>
-
-          <div className={sectionClass}>
-            <p className={label}>Data</p>
-            <div className={listGap}>
-              <button
-                type="button"
-                onClick={() => setShowImportModal(true)}
-                className={paletteItem}
-              >
-                <FileInput size={14} className={paletteItemIcon} />
-                <span className={paletteItemTitle}>Import Python</span>
-              </button>
-            </div>
-          </div>
-
-          <div className={sectionClass}>
-            <p className={label}>Nodes</p>
-            <div className={listGap}>
-              {nodeTypeInfos
-                .filter((info) => !AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
-                .sort((a, b) => a.label.localeCompare(b.label))
-                .map((info) => (
-                  <button
-                    key={info.type}
-                    type="button"
-                    onClick={() => handleAddNode(info.type)}
-                    className={paletteItem}
-                  >
-                    <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className={paletteItemTitle}>{info.label}</div>
-                      <div className={paletteItemDescription}>{info.description}</div>
-                    </div>
-                  </button>
-                ))}
-            </div>
-          </div>
+          {renderSection()}
         </div>
 
         <div className={cn(divider, panelSectionHeader, 'border-b-0 border-t-0 py-1.5')}>

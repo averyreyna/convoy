@@ -21,7 +21,6 @@ type AiSummarizeDataNodeProps = NodeProps & {
   data: AiSummarizeDataNodeData;
 };
 
-/** Get the first confirmed data source node's output (fallback when nothing is connected). */
 function useFirstDataSourceOutput() {
   const nodes = useCanvasStore((s) => s.nodes);
   const nodeOutputs = useDataStore((s) => s.nodeOutputs);
@@ -48,7 +47,7 @@ export function AiSummarizeDataNode({ id, data, selected }: AiSummarizeDataNodeP
 
   const upstreamData = useUpstreamData(id);
   const fallbackData = useFirstDataSourceOutput();
-  /** Use connected node's output if present, otherwise first data source in the pipeline. */
+  // use connected node's output if present, otherwise first data source in the pipeline
   const pipelineData = upstreamData?.columns?.length ? upstreamData : fallbackData;
 
   const setPrompt = useCallback(

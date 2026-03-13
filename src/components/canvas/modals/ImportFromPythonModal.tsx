@@ -94,7 +94,7 @@ export function ImportFromPythonModal({ onClose }: ImportFromPythonModalProps) {
             <div>
               <h2 className={headingBase}>Import from Python</h2>
               <p className={caption}>
-                Paste a pandas script to generate pipeline nodes
+                Paste a pandas script or code copied from Jupyter cells.
               </p>
             </div>
           </div>
@@ -116,10 +116,14 @@ export function ImportFromPythonModal({ onClose }: ImportFromPythonModalProps) {
             setError(null);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Paste your Python/pandas script here..."
+          placeholder="Paste your Python/pandas script or notebook cell code here..."
           className={cn(input.default, 'mb-3 h-40 resize-y font-mono text-sm')}
           disabled={isLoading}
         />
+
+        <p className={cn(caption, 'mb-2 text-gray-500')}>
+          You can copy cells from a .ipynb or paste a full script.
+        </p>
 
         <div className="mb-3">
           <button

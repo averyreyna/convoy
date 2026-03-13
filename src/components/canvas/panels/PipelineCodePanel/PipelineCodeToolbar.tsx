@@ -1,6 +1,6 @@
 import { Copy, Download, FileCode, Pin, Play, Plus, Square, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { label, button } from '@/flank';
+import { label, button, captionMuted } from '@/flank';
 
 interface PipelineCodeToolbarProps {
   canEditWithAI: boolean;
@@ -20,6 +20,10 @@ interface PipelineCodeToolbarProps {
   canDownloadNotebook: boolean;
   onDownloadNotebook: () => void;
   onAddCell: () => void;
+  /** When true, show "Notebook downloaded. Open in Jupyter or VS Code." below the toolbar. */
+  notebookDownloadFeedback?: boolean;
+  /** When set, show this hint below the toolbar (e.g. after Copy as Jupyter). */
+  copyFeedbackMessage?: string | null;
 }
 
 export function PipelineCodeToolbar({
@@ -40,11 +44,22 @@ export function PipelineCodeToolbar({
   canDownloadNotebook,
   onDownloadNotebook,
   onAddCell,
+  notebookDownloadFeedback = false,
+  copyFeedbackMessage = null,
 }: PipelineCodeToolbarProps) {
+  const showExportHint =
+    notebookDownloadFeedback || (copyFeedbackMessage != null && copyFeedbackMessage !== '');
+
   return (
-    <div className="flex shrink-0 w-full items-center justify-between gap-4">
+    <div className="flex w-full shrink-0 flex-col gap-2">
+    <div className="flex w-full items-center justify-between gap-4">
       <div className="flex items-center gap-3">
-        <span className={label}>Pipeline code</span>
+        <div className="flex min-w-[220px] flex-col gap-1">
+          <span className={label}>Pipeline code</span>
+          <span className={cn(captionMuted, 'leading-relaxed')}>
+            Same order as exported notebook. Edit here or download to open in Jupyter.
+          </span>
+        </div>
         <button
           type="button"
           onClick={onToggleEditWithAI}
@@ -53,7 +68,7 @@ export function PipelineCodeToolbar({
             button.base,
             button.variants.secondary,
             button.sizes.sm,
-            'disabled:opacity-50'
+            'min-h-[26px] shrink-0 whitespace-nowrap disabled:opacity-50'
           )}
           title="Edit selected cells with AI"
         >
@@ -93,22 +108,20 @@ export function PipelineCodeToolbar({
       <div className="flex items-center gap-1">
         <button
           type="button"
-          onClick={onCopyScript}
-          disabled={!canCopyScript}
+          onClick={onDownloadNotebook}
+          disabled={!canDownloadNotebook}
           className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
-          title={copyFeedback === 'script' ? 'Copied' : 'Copy Python script'}
+          title="Download as Jupyter notebook (.ipynb). Open in Jupyter or VS Code."
         >
-          <Copy size={13} />
-          {copyFeedback === 'script' && (
-            <span className="text-[9px] font-medium text-emerald-600">Copied</span>
-          )}
+          <Download size={13} />
+          <span className="text-[10px]">Notebook</span>
         </button>
         <button
           type="button"
           onClick={onCopyJupyter}
           disabled={!canCopyJupyter}
           className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
-          title={copyFeedback === 'jupyter' ? 'Copied' : 'Copy as Jupyter cells'}
+          title={copyFeedback === 'jupyter' ? 'Copied' : 'Copy as Jupyter cells. Paste in Jupyter or a .py file (Run Cell with # %%).'}
         >
           <FileCode size={13} />
           {copyFeedback === 'jupyter' && (
@@ -117,21 +130,25 @@ export function PipelineCodeToolbar({
         </button>
         <button
           type="button"
-          onClick={onDownloadPy}
-          disabled={!canDownloadPy}
+          onClick={onCopyScript}
+          disabled={!canCopyScript}
           className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
-          title="Download as .py"
+          title={copyFeedback === 'script' ? 'Copied' : 'Copy as plain Python script'}
         >
-          <Download size={13} />
+          <Copy size={13} />
+          {copyFeedback === 'script' && (
+            <span className="text-[9px] font-medium text-emerald-600">Copied</span>
+          )}
         </button>
         <button
           type="button"
-          onClick={onDownloadNotebook}
-          disabled={!canDownloadNotebook}
+          onClick={onDownloadPy}
+          disabled={!canDownloadPy}
           className={cn(button.base, button.variants.ghost, button.sizes.sm, 'disabled:opacity-50')}
-          title="Download as .ipynb"
+          title="Download as script (.py)"
         >
-          .ipynb
+          <Download size={13} />
+          <span className="text-[10px]">.py</span>
         </button>
         <button
           type="button"
@@ -142,6 +159,14 @@ export function PipelineCodeToolbar({
           <Plus size={13} />
         </button>
       </div>
+    </div>
+    {showExportHint && (
+      <p className={cn(captionMuted, 'leading-relaxed')}>
+        {notebookDownloadFeedback
+          ? 'Notebook downloaded. Open the file in Jupyter or VS Code.'
+          : copyFeedbackMessage}
+      </p>
+    )}
     </div>
   );
 }

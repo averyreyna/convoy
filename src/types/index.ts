@@ -1,5 +1,7 @@
 export type NodeState = 'proposed' | 'confirmed' | 'running' | 'error';
 
+export type EdgeStatus = 'proposed' | 'confirmed' | 'running' | 'error';
+
 export interface Column {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'date';

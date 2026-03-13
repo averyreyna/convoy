@@ -104,3 +104,23 @@ samp {
   box-shadow: none;
 }
 
+@keyframes data-flow-edge-running-pulse {
+  0% {
+    stroke-opacity: 0.8;
+  }
+  50% {
+    stroke-opacity: 1;
+  }
+  100% {
+    stroke-opacity: 0.8;
+  }
+}
+
+.data-flow-edge.data-flow-edge--running path {
+  animation: data-flow-edge-running-pulse 1s ease-in-out infinite;
+}
+
+.data-flow-edge.data-flow-edge--error path {
+  stroke-linecap: round;
+}
+

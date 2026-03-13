@@ -31,7 +31,7 @@ export function useAIExplanation({
   const [explanation, setExplanation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Use a ref to track the current fetch to avoid race conditions
+  // use a ref to track the current fetch to avoid race conditions
   const fetchIdRef = useRef(0);
 
   const cacheKey = JSON.stringify({ nodeType, nodeConfig });
@@ -40,7 +40,6 @@ export function useAIExplanation({
     setIsOpen(true);
     setError(null);
 
-    // Check cache first
     const cached = explanationCache.get(cacheKey);
     if (cached) {
       setExplanation(cached);
@@ -48,7 +47,6 @@ export function useAIExplanation({
       return;
     }
 
-    // Fetch from API
     const fetchId = ++fetchIdRef.current;
     setIsLoading(true);
 
@@ -59,7 +57,6 @@ export function useAIExplanation({
       outputRowCount,
     })
       .then((result) => {
-        // Only update if this is still the most recent fetch
         if (fetchId === fetchIdRef.current) {
           explanationCache.set(cacheKey, result);
           setExplanation(result);

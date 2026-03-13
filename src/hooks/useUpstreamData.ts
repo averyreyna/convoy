@@ -11,11 +11,10 @@ import type { DataFrame } from '@/types';
  */
 export function useUpstreamData(nodeId: string): DataFrame | undefined {
   const edges = useCanvasStore((s) => s.edges);
-  const nodeOutputs = useDataStore((s) => s.nodeOutputs);
-
-  // Find the edge where this node is the target (incoming data)
   const incomingEdge = edges.find((e) => e.target === nodeId);
-  if (!incomingEdge) return undefined;
-
-  return nodeOutputs[incomingEdge.source];
+  const sourceId = incomingEdge?.source;
+  const upstreamOutput = useDataStore((s) =>
+    sourceId != null ? s.nodeOutputs[sourceId] : undefined
+  );
+  return upstreamOutput;
 }

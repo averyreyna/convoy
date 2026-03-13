@@ -80,6 +80,7 @@ export function CanvasControls() {
                   setShowImportModal(true);
                 }}
                 className={menuItem}
+                title="Paste a script or code from Jupyter."
               >
                 <span className={cn(menuItemIcon, 'flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700')}>
                   PY
@@ -120,11 +121,12 @@ export function CanvasControls() {
                 }}
                 disabled={!hasNodes}
                 className={cn(menuItem, !hasNodes && 'cursor-not-allowed text-gray-400')}
+                title="Download as script (.py). For a Jupyter notebook, use the Pipeline code panel → Download notebook."
               >
                 <span className={cn(menuItemIcon, 'flex h-5 w-5 items-center justify-center rounded bg-blue-100 text-[9px] font-bold text-blue-700')}>
                   PY
                 </span>
-                Export as Python
+                Download as script (.py)
               </button>
             </div>
           )}
