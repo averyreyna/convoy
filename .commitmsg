@@ -1,0 +1,10 @@
+Add supertest integration tests for AI API routes
+
+- Extract Express app into server/app.ts for testable imports
+- Add shared test helpers and fixtures (tests/api/helpers.ts)
+- Add integration tests for all 6 AI routes:
+  editNodes, answerAboutNodes, cleanData, summarizeData,
+  diagnoseNodes, explainNode
+- Install supertest and @types/supertest as dev dependencies
+- 35 new tests covering validation, mock AI responses, no-key
+  fallbacks, and error handling
