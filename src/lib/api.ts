@@ -21,6 +21,11 @@ export type { EditNodesSchema, EditNodesPipelineContext, EditNodesResponse, Sugg
  */
 const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
 
+function buildApiUrl(path: string): string {
+  if (!API_BASE) return path;
+  return `${API_BASE.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
 /**
  * Generate a plain-language explanation for a node.
  * Sends node type, config, and row counts to the backend, which calls Claude
@@ -96,7 +101,7 @@ export async function editNodes(params: {
 }): Promise<EditNodesResponse> {
   const { nodeIds, prompt, schema, pipelineContext } = params;
 
-  const url = `${API_BASE || ''}/api/edit-nodes`.replace(/\/+/, '/');
+  const url = buildApiUrl('/api/edit-nodes');
   if (import.meta.env.DEV) {
     console.log('[editNodes] Request', { url: url || '(relative)', nodeIds, promptLength: prompt.length });
   }
@@ -149,7 +154,7 @@ export async function answerAboutNodes(params: {
 }): Promise<AnswerAboutNodesResponse> {
   const { nodeIds, question, schema, pipelineContext } = params;
 
-  const url = `${API_BASE || ''}/api/answer-about-nodes`.replace(/\/+/, '/');
+  const url = buildApiUrl('/api/answer-about-nodes');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -192,7 +197,7 @@ export async function diagnoseNodesWithAi(params: {
 }): Promise<{ diagnosis: string }> {
   const { nodeIds, question, schema, sampleRows, pipelineContext } = params;
 
-  const url = `${API_BASE || ''}/api/diagnose-nodes`.replace(/\/+/, '/');
+  const url = buildApiUrl('/api/diagnose-nodes');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -240,7 +245,7 @@ export async function renderChart(params: {
   height?: number;
   format?: 'png' | 'svg';
 }): Promise<{ image: string }> {
-  const url = `${API_BASE || ''}/api/render-chart`.replace(/\/+/, '/');
+  const url = buildApiUrl('/api/render-chart');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -278,7 +283,7 @@ export async function cleanDataWithAi(params: {
   sampleRows?: Record<string, unknown>[];
 }): Promise<{ code: string }> {
   const { instruction, schema, sampleRows } = params;
-  const url = `${API_BASE || ''}/api/clean-data`.replace(/\/+/, '/');
+  const url = buildApiUrl('/api/clean-data');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -316,7 +321,7 @@ export async function summarizeDataWithAi(params: {
   prompt?: string;
 }): Promise<{ summary: string; title?: string }> {
   const { schema, sampleRows, prompt } = params;
-  const url = `${API_BASE || ''}/api/summarize-data`.replace(/\/+/, '/');
+  const url = buildApiUrl('/api/summarize-data');
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
