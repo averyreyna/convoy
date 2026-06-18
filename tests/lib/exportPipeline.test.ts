@@ -3,6 +3,11 @@ import {
   topologicalSort,
   pipelineNodesOnly,
   topologicalSortPipeline,
+  backwardSlice,
+  leafPipelineNodes,
+  pipelineHasBranch,
+  buildThreadedBlocks,
+  exportAsThreadedPython,
   exportAsPython,
   exportAsNotebookJson,
   buildScriptFromCellCodes,
@@ -106,6 +111,78 @@ describe('topologicalSortPipeline', () => {
   });
 });
 
+describe('backwardSlice', () => {
+  it('returns empty array when target is not a pipeline node', () => {
+    const a = node('a', 'dataSource');
+    expect(backwardSlice('missing', [a], [])).toEqual([]);
+  });
+
+  it('returns just the node itself when it has no parent', () => {
+    const a = node('a', 'dataSource');
+    expect(backwardSlice('a', [a], []).map((n) => n.id)).toEqual(['a']);
+  });
+
+  it('returns the full chain root → target in order for a linear pipeline', () => {
+    const a = node('a', 'dataSource');
+    const b = node('b', 'filter');
+    const c = node('c', 'sort');
+    const edges = [edge('e1', 'a', 'b'), edge('e2', 'b', 'c')];
+    expect(backwardSlice('c', [a, b, c], edges).map((n) => n.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('follows only the target branch in a fan-out graph', () => {
+    // a ─┬─ b (filter) ── chart1
+    //    └─ c (sort)
+    const a = node('a', 'dataSource');
+    const b = node('b', 'filter');
+    const chart1 = node('chart1', 'chart');
+    const c = node('c', 'sort');
+    const edges = [
+      edge('e1', 'a', 'b'),
+      edge('e2', 'b', 'chart1'),
+      edge('e3', 'a', 'c'),
+    ];
+    const nodes = [a, b, chart1, c];
+    expect(backwardSlice('chart1', nodes, edges).map((n) => n.id)).toEqual(['a', 'b', 'chart1']);
+    expect(backwardSlice('c', nodes, edges).map((n) => n.id)).toEqual(['a', 'c']);
+  });
+
+  it('excludes meta/AI nodes from the lineage', () => {
+    const a = node('a', 'dataSource');
+    const ai = node('ai', 'aiQuery');
+    const b = node('b', 'filter');
+    const edges = [edge('e1', 'a', 'ai'), edge('e2', 'a', 'b')];
+    expect(backwardSlice('b', [a, ai, b], edges).map((n) => n.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('leafPipelineNodes', () => {
+  it('returns the single terminal node of a linear pipeline', () => {
+    const a = node('a', 'dataSource');
+    const b = node('b', 'filter');
+    const c = node('c', 'sort');
+    const edges = [edge('e1', 'a', 'b'), edge('e2', 'b', 'c')];
+    expect(leafPipelineNodes([a, b, c], edges).map((n) => n.id)).toEqual(['c']);
+  });
+
+  it('returns every terminal node when the pipeline branches', () => {
+    const a = node('a', 'dataSource');
+    const b = node('b', 'filter');
+    const c = node('c', 'sort');
+    const edges = [edge('e1', 'a', 'b'), edge('e2', 'a', 'c')];
+    const leaves = leafPipelineNodes([a, b, c], edges).map((n) => n.id).sort();
+    expect(leaves).toEqual(['b', 'c']);
+  });
+
+  it('ignores edges to meta/AI nodes when finding leaves', () => {
+    const a = node('a', 'dataSource');
+    const ai = node('ai', 'aiAdvisor');
+    const edges = [edge('e1', 'a', 'ai')];
+    // 'a' only points to an AI node, so within the pipeline it is itself a leaf.
+    expect(leafPipelineNodes([a, ai], edges).map((n) => n.id)).toEqual(['a']);
+  });
+});
+
 describe('exportAsPython', () => {
   it('contains import pandas and node comments and expected snippets for dataSource + filter', () => {
     const nodes = [
@@ -120,6 +197,88 @@ describe('exportAsPython', () => {
     expect(out).toContain('df["x"]');
     expect(out).toContain('==');
     expect(out).toContain('Pipeline complete');
+  });
+});
+
+describe('pipelineHasBranch', () => {
+  it('is false for a linear pipeline', () => {
+    const a = node('a', 'dataSource');
+    const b = node('b', 'filter');
+    const edges = [edge('e1', 'a', 'b')];
+    expect(pipelineHasBranch([a, b], edges)).toBe(false);
+  });
+
+  it('is true when a node fans out to two children', () => {
+    const a = node('a', 'dataSource');
+    const b = node('b', 'filter');
+    const c = node('c', 'sort');
+    const edges = [edge('e1', 'a', 'b'), edge('e2', 'a', 'c')];
+    expect(pipelineHasBranch([a, b, c], edges)).toBe(true);
+  });
+
+  it('ignores fan-out to meta/AI nodes', () => {
+    const a = node('a', 'dataSource');
+    const b = node('b', 'filter');
+    const ai = node('ai', 'aiQuery');
+    const edges = [edge('e1', 'a', 'b'), edge('e2', 'a', 'ai')];
+    expect(pipelineHasBranch([a, b, ai], edges)).toBe(false);
+  });
+});
+
+describe('buildThreadedBlocks', () => {
+  it('threads each branch off its real parent variable, not a shared df', () => {
+    // source ─┬─ filter (region == EU)
+    //         └─ sort (rev desc)
+    const src = node('src', 'dataSource', { fileName: 'sales.csv' });
+    const flt = node('flt', 'filter', {
+      label: 'Filter',
+      column: 'region',
+      operator: 'eq',
+      value: 'EU',
+    });
+    const srt = node('srt', 'sort', { label: 'Sort', column: 'rev', direction: 'desc' });
+    const edges = [edge('e1', 'src', 'flt'), edge('e2', 'src', 'srt')];
+    const blocks = buildThreadedBlocks([src, flt, srt], edges);
+
+    const byNode = new Map(blocks.map((b) => [b.nodeId, b]));
+    const srcVar = byNode.get('src')!.varName;
+
+    // Root captures its output; has no rebind line.
+    expect(byNode.get('src')!.code).not.toMatch(/\.copy\(\)/);
+    expect(byNode.get('src')!.code).toContain(`${srcVar} = df`);
+
+    // Both children rebind df from the SAME source variable.
+    expect(byNode.get('flt')!.code).toContain(`df = ${srcVar}.copy()`);
+    expect(byNode.get('srt')!.code).toContain(`df = ${srcVar}.copy()`);
+
+    // Each child captures into its own distinct variable.
+    expect(byNode.get('flt')!.varName).not.toBe(byNode.get('srt')!.varName);
+  });
+
+  it('gives colliding labels distinct variable names', () => {
+    const a = node('a', 'dataSource', { label: 'Step' });
+    const b = node('b', 'filter', { label: 'Step', column: 'x', operator: 'eq', value: '1' });
+    const edges = [edge('e1', 'a', 'b')];
+    const blocks = buildThreadedBlocks([a, b], edges);
+    const names = blocks.map((bl) => bl.varName);
+    expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe('exportAsThreadedPython', () => {
+  it('emits named variables and pandas import for a branching pipeline', () => {
+    const src = node('src', 'dataSource', { fileName: 'sales.csv' });
+    const flt = node('flt', 'filter', { column: 'region', operator: 'eq', value: 'EU' });
+    const srt = node('srt', 'sort', { column: 'rev', direction: 'desc' });
+    const edges = [edge('e1', 'src', 'flt'), edge('e2', 'src', 'srt')];
+    const out = exportAsThreadedPython([src, flt, srt], edges);
+    expect(out).toContain('import pandas as pd');
+    expect(out).toContain('pd.read_csv("sales.csv")');
+    // Both branches rebind from the source variable (not chained off each other).
+    const sourceRebinds = out.match(/df = df_datasource\.copy\(\)/g) ?? [];
+    expect(sourceRebinds).toHaveLength(2);
+    // The sort branch must not read the filtered frame.
+    expect(out).not.toContain('df_filter.copy()');
   });
 });
 

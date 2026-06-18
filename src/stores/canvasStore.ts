@@ -16,6 +16,13 @@ import { usePreferencesStore } from './preferencesStore';
 export interface ApplyImportOptions {
   /** When set (Run cell at index K), only update existing nodes at indices 0..K. */
   upToIndex?: number;
+  /**
+   * Explicit existing-node ids the parsed pipeline maps onto, in order
+   * (parsed[i] → nodeIdOrder[i]). Used by slice-scoped runs so results are
+   * written back to that lineage's nodes rather than by global topo index.
+   * When set, no nodes are appended.
+   */
+  nodeIdOrder?: string[];
 }
 
 export type BaselineLanguage = 'python';
@@ -92,6 +99,20 @@ interface CanvasStore {
 
   // Selection (canvas + code panel): set selected node IDs so both surfaces stay in sync
   setSelectedNodeIds: (nodeIds: string[]) => void;
+
+  // Hover-link (canvas + code panel): the node currently hovered on either surface,
+  // so the matching node and its code cell can highlight together.
+  hoveredNodeId: string | null;
+  setHoveredNodeId: (id: string | null) => void;
+
+  // Staleness: nodes whose output an upstream change has invalidated but that
+  // haven't recomputed yet. Kept out of node.data so it never affects execution,
+  // config, or diff logic — purely a visual "recalc wavefront".
+  staleNodeIds: Record<string, true>;
+  markChildrenStale: (nodeId: string) => void;
+  clearChildrenStale: (nodeId: string) => void;
+  clearNodeStale: (nodeId: string) => void;
+  clearAllStale: () => void;
 
   // Run all / Run cell in progress: when true, per-node execution skips starting new runs
   pipelineRunInProgress: boolean;
@@ -266,12 +287,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   removeNode: (id) =>
     set((state) => {
       const { [id]: _, ...baselineRest } = state.baselineByNodeId;
+      const { [id]: __, ...staleRest } = state.staleNodeIds;
       return {
         nodes: state.nodes.filter((node) => node.id !== id),
         edges: state.edges.filter(
           (edge) => edge.source !== id && edge.target !== id
         ),
         baselineByNodeId: baselineRest,
+        staleNodeIds: staleRest,
+        hoveredNodeId: state.hoveredNodeId === id ? null : state.hoveredNodeId,
       };
     }),
 
@@ -451,7 +475,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const pipelineNodes = pipeline.nodes || [];
     if (pipelineNodes.length === 0) return;
 
-    const orderedNodes = topologicalSortPipeline(existingNodes, existingEdges);
+    const nodeIdOrder = options?.nodeIdOrder;
+    const existingById = new Map(existingNodes.map((n) => [n.id, n]));
+    const orderedNodes = nodeIdOrder
+      ? (nodeIdOrder
+          .map((id) => existingById.get(id))
+          .filter((n): n is Node => n !== undefined))
+      : topologicalSortPipeline(existingNodes, existingEdges);
     if (orderedNodes.length === 0) return;
 
     const upToIndex = options?.upToIndex;
@@ -485,6 +515,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
     if (
       upToIndex === undefined &&
+      !nodeIdOrder &&
       pipelineNodes.length > orderedNodes.length
     ) {
       const lastNode = orderedNodes[orderedNodes.length - 1];
@@ -691,6 +722,42 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         selected: nodeIds.includes(node.id),
       })),
     })),
+
+  hoveredNodeId: null,
+  setHoveredNodeId: (id) =>
+    set((state) => (state.hoveredNodeId === id ? state : { hoveredNodeId: id })),
+
+  staleNodeIds: {},
+  markChildrenStale: (nodeId) =>
+    set((state) => {
+      const childIds = state.edges
+        .filter((e) => e.source === nodeId)
+        .map((e) => e.target);
+      if (childIds.every((id) => state.staleNodeIds[id])) return state;
+      const next = { ...state.staleNodeIds };
+      for (const id of childIds) next[id] = true;
+      return { staleNodeIds: next };
+    }),
+  clearChildrenStale: (nodeId) =>
+    set((state) => {
+      const childIds = state.edges
+        .filter((e) => e.source === nodeId)
+        .map((e) => e.target);
+      if (childIds.every((id) => !state.staleNodeIds[id])) return state;
+      const next = { ...state.staleNodeIds };
+      for (const id of childIds) delete next[id];
+      return { staleNodeIds: next };
+    }),
+  clearNodeStale: (nodeId) =>
+    set((state) => {
+      if (!state.staleNodeIds[nodeId]) return state;
+      const { [nodeId]: _, ...rest } = state.staleNodeIds;
+      return { staleNodeIds: rest };
+    }),
+  clearAllStale: () =>
+    set((state) =>
+      Object.keys(state.staleNodeIds).length === 0 ? state : { staleNodeIds: {} }
+    ),
 
   pipelineRunInProgress: false,
   setPipelineRunInProgress: (value) => set({ pipelineRunInProgress: value }),

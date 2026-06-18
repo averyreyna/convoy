@@ -43,6 +43,18 @@ export const notebookCellSelected = style({
   boxShadow: vars.shadows.blue100,
 });
 
+/** Ring shown when the linked canvas node is hovered (bidirectional hover-link). */
+export const notebookCellHovered = style({
+  borderColor: vars.color.blue[300],
+  boxShadow: vars.shadows.blueRing,
+});
+
+/** Amber accent when an upstream change has invalidated this cell's node output. */
+export const notebookCellStale = style({
+  borderLeftColor: vars.color.amber[400],
+  background: vars.color.amber[50],
+});
+
 /** Left gutter column: execution prompt + optional run. */
 export const notebookCellGutter = style({
   width: '3.5rem',

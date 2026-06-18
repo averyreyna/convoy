@@ -6,7 +6,8 @@ import { generateNodeCode } from '@/lib/codeGenerators';
 import { parseNodeCode } from '@/lib/codeParsers';
 import {
   topologicalSortPipeline,
-  exportAsPython,
+  backwardSlice,
+  leafPipelineNodes,
   exportAsPythonWithLineMap,
   buildScriptFromCellCodes,
   buildScriptForBrowserRun,
@@ -52,6 +53,7 @@ export function PipelineCodePanel() {
   const setBaselineForSelection = useCanvasStore((s) => s.setBaselineForSelection);
   const setBaselineForNodeIds = useCanvasStore((s) => s.setBaselineForNodeIds);
   const setPipelineRunInProgress = useCanvasStore((s) => s.setPipelineRunInProgress);
+  const clearAllStale = useCanvasStore((s) => s.clearAllStale);
   const baselineCode = useCanvasStore((s) => s.baselineCode);
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
   const aiNotebookCells = useCanvasStore((s) => s.aiNotebookCells);
@@ -170,9 +172,34 @@ export function PipelineCodePanel() {
       });
   }, [aiNotebookCells, nodes]);
 
+  // Focus/backward-slice: when exactly one node-backed node is selected, the
+  // panel shows only that node's lineage (root → node). With none or many
+  // selected, it shows the full pipeline. Hidden behind a "Show full pipeline"
+  // breadcrumb so the slice is never a trap.
+  const sliceNodeId = useMemo(() => {
+    const selected = nodes.filter((n) => n.selected);
+    return selected.length === 1 ? selected[0].id : null;
+  }, [nodes]);
+
+  const sliceNodeIds = useMemo(
+    () =>
+      sliceNodeId ? backwardSlice(sliceNodeId, nodes, edges).map((n) => n.id) : null,
+    [sliceNodeId, nodes, edges]
+  );
+
+  const displayedCodeCells: CodePipelineCellViewModel[] = useMemo(() => {
+    if (!sliceNodeIds) return codeCells;
+    const byId = new Map(codeCells.map((c) => [c.nodeId, c]));
+    return sliceNodeIds
+      .map((id) => byId.get(id))
+      .filter((c): c is CodePipelineCellViewModel => c !== undefined);
+  }, [codeCells, sliceNodeIds]);
+
+  // In slice view show only the lineage's code cells; in full view interleave AI
+  // conversation cells as before.
   const cells: PipelineCellViewModel[] = useMemo(
-    () => [...codeCells, ...aiCells],
-    [codeCells, aiCells]
+    () => (sliceNodeIds ? [...displayedCodeCells] : [...codeCells, ...aiCells]),
+    [sliceNodeIds, displayedCodeCells, codeCells, aiCells]
   );
 
   const fullScript = useMemo(() => {
@@ -194,6 +221,7 @@ export function PipelineCodePanel() {
       scriptForRun: string,
       options?: {
         upToIndex?: number;
+        nodeIdOrder?: string[];
         clearDraftsOnSuccess?: boolean;
         nodeIdsForBaseline?: string[];
       }
@@ -208,10 +236,10 @@ export function PipelineCodePanel() {
           setPipelineFromImport(pipeline);
           setDraftCells([]);
         } else {
-          applyImportToExistingPipeline(
-            pipeline,
-            options?.upToIndex !== undefined ? { upToIndex: options.upToIndex } : undefined
-          );
+          applyImportToExistingPipeline(pipeline, {
+            ...(options?.upToIndex !== undefined ? { upToIndex: options.upToIndex } : {}),
+            ...(options?.nodeIdOrder ? { nodeIdOrder: options.nodeIdOrder } : {}),
+          });
           if (options?.clearDraftsOnSuccess && draftCells.length > 0) {
             setDraftCells([]);
           }
@@ -231,6 +259,8 @@ export function PipelineCodePanel() {
       } finally {
         setIsRunning(false);
         setPipelineRunInProgress(false);
+        // A full run reconciles every node, so no stale marks should linger.
+        clearAllStale();
       }
     },
     [
@@ -239,34 +269,83 @@ export function PipelineCodePanel() {
       setBaselineFromPin,
       setBaselineForNodeIds,
       setPipelineRunInProgress,
+      clearAllStale,
       nodes.length,
       draftCells.length,
     ]
   );
 
-  const handleRunAll = useCallback(() => {
+  // "Run up to this node" = run the node's lineage slice. The slice is linear,
+  // so the existing single-`df` codegen runs it correctly; results are written
+  // back to that lineage's nodes (nodeIdOrder), not by global topo index.
+  const runSliceForNode = useCallback(
+    (nodeId: string) => {
+      const sliceIds = backwardSlice(nodeId, nodes, edges).map((n) => n.id);
+      if (sliceIds.length === 0) return Promise.resolve();
+      const byId = new Map(codeCells.map((c) => [c.nodeId, c]));
+      const cellCodes = sliceIds
+        .map((id) => byId.get(id))
+        .filter((c): c is CodePipelineCellViewModel => c !== undefined)
+        .map((c) => ({ code: c.code, nodeType: c.nodeType }));
+      const scriptForImport = buildScriptFromCellCodes(cellCodes);
+      const scriptForRun = buildScriptForBrowserRun(cellCodes, undefined, dataSourceColumnNames);
+      return runScriptAndImport(scriptForImport, scriptForRun, {
+        nodeIdOrder: sliceIds,
+        nodeIdsForBaseline: sliceIds,
+      });
+    },
+    [nodes, edges, codeCells, dataSourceColumnNames, runScriptAndImport]
+  );
+
+  const handleRunAll = useCallback(async () => {
     if (codeCells.length === 0) return;
-    const cellCodes = codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType }));
-    const scriptForImport = buildScriptFromCellCodes(cellCodes);
-    const scriptForRun = buildScriptForBrowserRun(cellCodes, undefined, dataSourceColumnNames);
-    runScriptAndImport(scriptForImport, scriptForRun, {
-      clearDraftsOnSuccess: draftCells.length > 0,
-      nodeIdsForBaseline: nodeCells.map((c) => c.nodeId),
-    });
-  }, [codeCells, dataSourceColumnNames, runScriptAndImport, draftCells.length, nodeCells]);
+    const leaves = leafPipelineNodes(nodes, edges);
+    // One terminal (linear pipeline, the common case): a single full-script run,
+    // which also covers any appended draft cells.
+    if (leaves.length <= 1) {
+      const cellCodes = codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType }));
+      const scriptForImport = buildScriptFromCellCodes(cellCodes);
+      const scriptForRun = buildScriptForBrowserRun(cellCodes, undefined, dataSourceColumnNames);
+      await runScriptAndImport(scriptForImport, scriptForRun, {
+        clearDraftsOnSuccess: draftCells.length > 0,
+        nodeIdsForBaseline: nodeCells.map((c) => c.nodeId),
+      });
+      return;
+    }
+    // Branched pipeline: run each leaf's lineage so every branch computes against
+    // its real inputs (a single mutated `df` would be wrong across branches).
+    for (const leaf of leaves) {
+      await runSliceForNode(leaf.id);
+    }
+  }, [
+    codeCells,
+    nodes,
+    edges,
+    dataSourceColumnNames,
+    runScriptAndImport,
+    draftCells.length,
+    nodeCells,
+    runSliceForNode,
+  ]);
 
   const handleRunCell = useCallback(
     (runIndex: number) => {
+      const cell = codeCells[runIndex];
+      if (!cell) return;
+      if (!cell.nodeId.startsWith('draft-')) {
+        void runSliceForNode(cell.nodeId);
+        return;
+      }
+      // Draft cell (not yet a graph node): run the full pipeline plus drafts up
+      // to this one, appending the parsed draft(s) as new nodes.
       const cellCodes = codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType }));
       const scriptForImport = buildScriptFromCellCodes(cellCodes, runIndex);
       const scriptForRun = buildScriptForBrowserRun(cellCodes, runIndex, dataSourceColumnNames);
-      const runIncludesDrafts = runIndex >= nodeCells.length;
       runScriptAndImport(scriptForImport, scriptForRun, {
-        upToIndex: runIncludesDrafts ? undefined : runIndex,
-        clearDraftsOnSuccess: runIncludesDrafts,
+        clearDraftsOnSuccess: true,
       });
     },
-    [codeCells, nodeCells.length, dataSourceColumnNames, runScriptAndImport]
+    [codeCells, dataSourceColumnNames, runScriptAndImport, runSliceForNode]
   );
 
   const handleCellChange = useCallback(
@@ -595,6 +674,26 @@ export function PipelineCodePanel() {
       )}
 
       <div className={cn(notebookScrollArea)}>
+        {sliceNodeIds && (
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-blue-100 bg-blue-50/60 px-2 py-1">
+            <span className={cn(caption, 'min-w-0 flex-1 truncate text-blue-700')}>
+              Lineage: {displayedCodeCells.map((c) => c.label).join(' → ')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedNodeIds([])}
+              className={cn(
+                button.base,
+                button.variants.ghost,
+                button.sizes.sm,
+                'shrink-0 text-blue-600 hover:bg-blue-100'
+              )}
+              title="Show the full pipeline"
+            >
+              Show full pipeline
+            </button>
+          </div>
+        )}
         {cells.length === 0 ? (
           <div className="flex min-h-[120px] flex-col justify-center px-1">
             <p className={cn(captionMuted, 'leading-relaxed')}>

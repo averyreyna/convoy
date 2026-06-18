@@ -1,5 +1,4 @@
-import { style, styleVariants } from '@vanilla-extract/css';
-import { keyframes } from '@vanilla-extract/css';
+import { style, styleVariants, keyframes } from '@vanilla-extract/css';
 import { vars } from '../../theme/index.css';
 
 const pulse = keyframes({
@@ -54,6 +53,21 @@ export const cardSelected = style({
   background: 'rgba(239, 246, 255, 0.5)',
 });
 
+/** Ring shown when the linked code cell is hovered (bidirectional hover-link). */
+export const cardHovered = style({
+  boxShadow: vars.shadows.blueRing,
+});
+
+/**
+ * Dimmed amber accent shown when an upstream change has invalidated this node's
+ * output but it hasn't recomputed yet. Cleared as the node re-runs.
+ */
+export const cardStale = style({
+  borderColor: vars.color.amber[300],
+  boxShadow: vars.shadows.amber100,
+  opacity: 0.75,
+});
+
 export const cardWide = style({
   minWidth: '520px',
   maxWidth: '580px',
@@ -63,5 +77,7 @@ export const card = {
   base,
   stateVariants: cardStateVariants,
   selected: cardSelected,
+  hovered: cardHovered,
+  stale: cardStale,
   wide: cardWide,
 };

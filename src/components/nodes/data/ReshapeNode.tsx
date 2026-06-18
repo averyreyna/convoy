@@ -20,14 +20,16 @@ export function ReshapeNode({ id, data, selected }: ReshapeNodeProps) {
 
   const selectedPivotColumns = data.pivotColumns ?? [];
 
-  // Build config object for the executor
+  // Build config object for the executor. Depend on data.pivotColumns directly:
+  // `data.pivotColumns ?? []` produces a fresh array each render when it is
+  // undefined, which would make config (and the execution effect) unstable.
   const config = useMemo(
     () => ({
       keyColumn: data.keyColumn,
       valueColumn: data.valueColumn,
-      pivotColumns: selectedPivotColumns,
+      pivotColumns: data.pivotColumns ?? [],
     }),
-    [data.keyColumn, data.valueColumn, selectedPivotColumns]
+    [data.keyColumn, data.valueColumn, data.pivotColumns]
   );
 
   // Execute the node and get upstream data for column list

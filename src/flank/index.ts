@@ -66,6 +66,8 @@ export {
   notebookCell,
   notebookCellFocused,
   notebookCellSelected,
+  notebookCellHovered,
+  notebookCellStale,
   notebookCellGutter,
   notebookCellPrompt,
   notebookCellContent,

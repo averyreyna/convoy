@@ -64,7 +64,11 @@ export const BaseNode = memo(function BaseNode({
   detailMode,
 }: BaseNodeProps) {
   const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
+  const setHoveredNodeId = useCanvasStore((s) => s.setHoveredNodeId);
   const zoom = useCanvasStore((s) => s.viewport.zoom);
+  // Primitive selectors so each node only re-renders when its own hover/stale flips.
+  const isHovered = useCanvasStore((s) => nodeId != null && s.hoveredNodeId === nodeId);
+  const isStale = useCanvasStore((s) => nodeId != null && !!s.staleNodeIds[nodeId]);
 
   const detailModeRef = useRef<NodeDetailMode>('full');
   const effectiveDetailMode = useMemo<NodeDetailMode>(() => {
@@ -78,10 +82,15 @@ export const BaseNode = memo(function BaseNode({
 
   return (
     <div
+      onMouseEnter={() => nodeId != null && setHoveredNodeId(nodeId)}
+      onMouseLeave={() => nodeId != null && setHoveredNodeId(null)}
       className={cn(
         'group relative',
         card.base,
         card.stateVariants[state],
+        // Stale accent yields to the running animation while recomputing.
+        isStale && state !== 'running' && card.stale,
+        isHovered && card.hovered,
         selected && card.selected,
         wide && card.wide
       )}

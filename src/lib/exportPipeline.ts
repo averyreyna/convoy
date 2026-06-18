@@ -65,6 +65,145 @@ export function topologicalSortPipeline(nodes: Node[], edges: Edge[]): Node[] {
 }
 
 /**
+ * The lineage feeding a node: the chain of pipeline nodes from the root source
+ * down to (and including) `targetNodeId`, in execution order.
+ *
+ * Every node has at most one input (the graph only fans out, never in), so a
+ * slice is always a single linear chain — which makes it a correct, runnable
+ * sub-pipeline on its own. Returns [] if the target isn't a pipeline node.
+ */
+export function backwardSlice(targetNodeId: string, nodes: Node[], edges: Edge[]): Node[] {
+  const { nodes: pNodes, edges: pEdges } = pipelineNodesOnly(nodes, edges);
+  const nodeMap = new Map(pNodes.map((n) => [n.id, n]));
+  if (!nodeMap.has(targetNodeId)) return [];
+
+  // target → source lookup (≤1 parent per node given fan-out-only graphs).
+  const parentOf = new Map<string, string>();
+  for (const e of pEdges) parentOf.set(e.target, e.source);
+
+  const chain: Node[] = [];
+  const seen = new Set<string>();
+  let current: string | undefined = targetNodeId;
+  while (current && nodeMap.has(current) && !seen.has(current)) {
+    seen.add(current);
+    chain.unshift(nodeMap.get(current)!);
+    current = parentOf.get(current);
+  }
+  return chain;
+}
+
+/**
+ * Terminal pipeline nodes (no outgoing edge to another pipeline node). Each leaf
+ * is the end of one lineage; "Run all" runs every leaf's slice.
+ */
+export function leafPipelineNodes(nodes: Node[], edges: Edge[]): Node[] {
+  const { nodes: pNodes, edges: pEdges } = pipelineNodesOnly(nodes, edges);
+  const hasOutgoing = new Set(pEdges.map((e) => e.source));
+  return pNodes.filter((n) => !hasOutgoing.has(n.id));
+}
+
+/**
+ * True when a pipeline node fans out to 2+ children. A single mutated `df` can't
+ * faithfully represent that, so exports of a branching pipeline thread results
+ * through named per-node variables instead.
+ */
+export function pipelineHasBranch(nodes: Node[], edges: Edge[]): boolean {
+  const { edges: pEdges } = pipelineNodesOnly(nodes, edges);
+  const outCount = new Map<string, number>();
+  for (const e of pEdges) {
+    outCount.set(e.source, (outCount.get(e.source) ?? 0) + 1);
+  }
+  for (const count of outCount.values()) {
+    if (count >= 2) return true;
+  }
+  return false;
+}
+
+/** A node's generated code, threaded through a named variable for branching export. */
+export interface ThreadedBlock {
+  nodeId: string;
+  label: string;
+  nodeType: string;
+  /** Rebind from parent var + the node's verbatim single-`df` code + capture into this node's var. */
+  code: string;
+  /** The variable this node's output is captured into (e.g. df_filter). */
+  varName: string;
+}
+
+/** Turn a label into a unique, valid python identifier like `df_select_columns`. */
+function pythonVarName(label: string): string {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `df_${slug || 'step'}`;
+}
+
+/**
+ * Per-node code for a branching pipeline, threaded through named variables so
+ * each node reads its real parent's output rather than a single shared `df`.
+ *
+ * Each block rebinds `df` from the parent's captured variable, runs the node's
+ * existing (single-`df`) snippet verbatim, then captures the result into a named
+ * variable. Wrapping rather than rewriting keeps user-authored `df` references
+ * (computedColumn expressions, transform / aiCleanData code) correct without
+ * fragile string substitution; the `.copy()` on rebind keeps in-place mutations
+ * (e.g. computedColumn) from corrupting a shared upstream frame.
+ */
+export function buildThreadedBlocks(nodes: Node[], edges: Edge[]): ThreadedBlock[] {
+  const { nodes: pNodes, edges: pEdges } = pipelineNodesOnly(nodes, edges);
+  const ordered = topologicalSort(pNodes, pEdges);
+
+  const parentOf = new Map<string, string>();
+  for (const e of pEdges) parentOf.set(e.target, e.source);
+
+  const varOf = new Map<string, string>();
+  const used = new Set<string>();
+  for (const node of ordered) {
+    const base = pythonVarName(getNodeCode(node).label);
+    let name = base;
+    let n = 2;
+    while (used.has(name)) name = `${base}_${n++}`;
+    used.add(name);
+    varOf.set(node.id, name);
+  }
+
+  return ordered.map((node) => {
+    const { code, label, nodeType } = getNodeCode(node);
+    const outVar = varOf.get(node.id)!;
+    const parentId = parentOf.get(node.id);
+    const inVar = parentId ? varOf.get(parentId) : undefined;
+
+    const lines: string[] = [];
+    if (inVar) lines.push(`df = ${inVar}.copy()`);
+    lines.push(code.trim());
+    lines.push(`${outVar} = df`);
+    return { nodeId: node.id, label, nodeType, code: lines.join('\n'), varName: outVar };
+  });
+}
+
+/**
+ * Full Python export for a branching pipeline, using named per-node variables.
+ * Linear pipelines use the cleaner single-`df` `exportAsPython` instead.
+ */
+export function exportAsThreadedPython(nodes: Node[], edges: Edge[]): string {
+  const blocks = buildThreadedBlocks(nodes, edges);
+  const parts: string[] = [
+    `# Convoy Pipeline — Exported Python (branching)
+# Generated on ${new Date().toISOString()}
+# Each step reads its upstream variable so branches stay independent.
+
+import pandas as pd
+`,
+  ];
+  for (const b of blocks) {
+    const rule = '─'.repeat(Math.max(0, 50 - b.label.length - b.nodeType.length));
+    parts.push(`# ─── ${b.label} (${b.nodeType}) ${rule}\n${b.code}\n`);
+  }
+  return parts.join('\n');
+}
+
+/**
  * Get the generated or custom code for a node.
  */
 function getNodeCode(node: Node): { code: string; nodeType: string; label: string } {
@@ -306,7 +445,9 @@ function downloadFile(content: string, filename: string) {
  */
 export function downloadPipelineScript(nodes: Node[], edges: Edge[]) {
   const timestamp = Date.now();
-  const script = exportAsPython(nodes, edges);
+  const script = pipelineHasBranch(nodes, edges)
+    ? exportAsThreadedPython(nodes, edges)
+    : exportAsPython(nodes, edges);
   downloadFile(script, `convoy-pipeline-${timestamp}.py`);
 }
 
@@ -323,7 +464,6 @@ interface NotebookCodeCell {
  * Build Jupyter notebook (.ipynb) JSON from the pipeline.
  */
 export function exportAsNotebookJson(nodes: Node[], edges: Edge[]): string {
-  const sorted = topologicalSortPipeline(nodes, edges);
   const cells: NotebookCodeCell[] = [];
 
   cells.push({
@@ -334,8 +474,16 @@ export function exportAsNotebookJson(nodes: Node[], edges: Edge[]): string {
     metadata: {},
   });
 
-  for (const node of sorted) {
-    const { code, label } = getNodeCode(node);
+  // Branching pipelines thread named variables so each branch stays independent;
+  // linear pipelines keep the cleaner single-`df` per-cell code.
+  const codeByCell = pipelineHasBranch(nodes, edges)
+    ? buildThreadedBlocks(nodes, edges).map((b) => ({ code: b.code, label: b.label }))
+    : topologicalSortPipeline(nodes, edges).map((node) => {
+        const { code, label } = getNodeCode(node);
+        return { code, label };
+      });
+
+  for (const { code, label } of codeByCell) {
     const lines = code.split('\n').map((line) => line + '\n');
     if (lines.length > 0 && lines[lines.length - 1] === '\n') {
       lines[lines.length - 1] = lines[lines.length - 1].slice(0, -1);
@@ -384,10 +532,14 @@ export function downloadNotebook(nodes: Node[], edges: Edge[]) {
  * Copy pipeline as Jupyter-style cells (each block separated by "# %%") for pasting into VS Code / Jupyter.
  */
 export function copyAsJupyterCells(nodes: Node[], edges: Edge[]): string {
-  const sorted = topologicalSortPipeline(nodes, edges);
   const parts: string[] = ['# %%\nimport pandas as pd\n'];
-  for (const node of sorted) {
-    const { code, label } = getNodeCode(node);
+  const codeByCell = pipelineHasBranch(nodes, edges)
+    ? buildThreadedBlocks(nodes, edges).map((b) => ({ code: b.code, label: b.label }))
+    : topologicalSortPipeline(nodes, edges).map((node) => {
+        const { code, label } = getNodeCode(node);
+        return { code, label };
+      });
+  for (const { code, label } of codeByCell) {
     parts.push(`# %% ${label}\n${code}\n`);
   }
   return parts.join('\n');

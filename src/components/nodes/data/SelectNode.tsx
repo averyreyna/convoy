@@ -20,12 +20,14 @@ export function SelectNode({ id, data, selected }: SelectNodeProps) {
 
   const selectedColumns = data.columns ?? [];
 
-  // Build config object for the executor
+  // Build config object for the executor. Depend on data.columns directly:
+  // `data.columns ?? []` produces a fresh array each render when columns is
+  // undefined, which would make config (and the execution effect) unstable.
   const config = useMemo(
     () => ({
-      columns: selectedColumns,
+      columns: data.columns ?? [],
     }),
-    [selectedColumns]
+    [data.columns]
   );
 
   // Execute the node and get upstream data for column list

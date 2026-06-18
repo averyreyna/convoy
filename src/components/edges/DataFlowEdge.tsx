@@ -4,6 +4,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import type { EdgeStatus } from '@/types';
+import { useCanvasStore } from '@/stores/canvasStore';
 
 function getEdgeStyleForStatus(
   status: EdgeStatus | undefined
@@ -45,6 +46,8 @@ function getEdgeStyleForStatus(
 
 export function DataFlowEdge({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -57,6 +60,12 @@ export function DataFlowEdge({
 }: EdgeProps) {
   const status = (data as { status?: EdgeStatus } | undefined)?.status;
   const baseStyle = getEdgeStyleForStatus(status);
+
+  // Highlight edges touching the hovered node so the data path reads as connected.
+  const isHovered = useCanvasStore(
+    (s) => s.hoveredNodeId != null && (s.hoveredNodeId === source || s.hoveredNodeId === target)
+  );
+  const hoverStyle = isHovered ? { stroke: '#60a5fa', strokeWidth: 3, strokeOpacity: 1 } : null;
 
   const [edgePath] = getSmoothStepPath({
     sourceX,
@@ -80,6 +89,7 @@ export function DataFlowEdge({
       style={{
         ...baseStyle,
         ...style,
+        ...hoverStyle,
       }}
     />
   );

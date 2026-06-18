@@ -4,6 +4,7 @@ import { diffLines } from 'diff';
 import Editor from '@monaco-editor/react';
 import { ChevronDown, ChevronRight, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCanvasStore } from '@/stores/canvasStore';
 import {
   button,
   caption,
@@ -13,9 +14,11 @@ import {
   notebookCellFocused,
   notebookCellGutter,
   notebookCellHeader,
+  notebookCellHovered,
   notebookCellList,
   notebookCellPrompt,
   notebookCellSelected,
+  notebookCellStale,
 } from '@/flank';
 
 const MIN_EDITOR_HEIGHT = 52;
@@ -102,6 +105,10 @@ export function PipelineCellList({
   onRevertCell,
   onAcceptAsBaseline,
 }: PipelineCellListProps) {
+  const hoveredNodeId = useCanvasStore((s) => s.hoveredNodeId);
+  const staleNodeIds = useCanvasStore((s) => s.staleNodeIds);
+  const setHoveredNodeId = useCanvasStore((s) => s.setHoveredNodeId);
+
   if (cells.length === 0) {
     return null;
   }
@@ -145,6 +152,8 @@ export function PipelineCellList({
         const isNodeBacked = !cell.nodeId.startsWith('draft-');
         const isSelected = isNodeBacked && selectedNodeIds.has(cell.nodeId);
         const isFocused = focusedCellNodeId === cell.nodeId;
+        const isHovered = isNodeBacked && hoveredNodeId === cell.nodeId;
+        const isStale = isNodeBacked && !!staleNodeIds[cell.nodeId];
         const node = isNodeBacked ? nodes.find((n) => n.id === cell.nodeId) : null;
         const baseline = isNodeBacked && node ? baselineByNodeId[cell.nodeId] : undefined;
 
@@ -189,10 +198,14 @@ export function PipelineCellList({
             role="button"
             tabIndex={-1}
             onClick={(e) => onCellClick(e, cell, index)}
+            onMouseEnter={() => isNodeBacked && setHoveredNodeId(cell.nodeId)}
+            onMouseLeave={() => isNodeBacked && setHoveredNodeId(null)}
             className={cn(
               notebookCell,
+              isStale && notebookCellStale,
               isFocused && notebookCellFocused,
-              isSelected && notebookCellSelected
+              isSelected && notebookCellSelected,
+              isHovered && notebookCellHovered
             )}
           >
             <div className={notebookCellGutter}>

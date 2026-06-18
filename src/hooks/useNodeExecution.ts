@@ -86,6 +86,9 @@ export function useNodeExecution(
   const upstreamData = useUpstreamData(nodeId);
   const setNodeOutput = useDataStore((s) => s.setNodeOutput);
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const markChildrenStale = useCanvasStore((s) => s.markChildrenStale);
+  const clearChildrenStale = useCanvasStore((s) => s.clearChildrenStale);
+  const clearNodeStale = useCanvasStore((s) => s.clearNodeStale);
   const pipelineRunInProgress = useCanvasStore((s) => s.pipelineRunInProgress);
   const executionDebounceBypassUntil = useCanvasStore((s) => s.executionDebounceBypassUntil);
 
@@ -93,6 +96,7 @@ export function useNodeExecution(
   const [error, setError] = useState<string | null>(null);
 
   const lastExecKey = useRef<string>('');
+  const lastPassThroughKey = useRef<string>('');
   const runIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [runRequest, setRunRequest] = useState(0);
@@ -124,16 +128,33 @@ export function useNodeExecution(
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      setNodeOutput(nodeId, upstreamData);
-      updateNode(nodeId, {
-        inputRowCount: upstreamData.rows.length,
-        outputRowCount: upstreamData.rows.length,
-        state: 'confirmed',
-        error: undefined,
-      });
+      // Only write to the stores when the pass-through result would actually
+      // change. Writing unconditionally here re-renders the node, and if any
+      // input dependency is an unstable reference the effect would re-run and
+      // loop ("Maximum update depth exceeded").
+      const passKey = `${upstreamData.rows.length}:${upstreamData.columns
+        .map((c) => c.name)
+        .join(',')}`;
+      if (passKey !== lastPassThroughKey.current) {
+        lastPassThroughKey.current = passKey;
+        setNodeOutput(nodeId, upstreamData);
+        updateNode(nodeId, {
+          inputRowCount: upstreamData.rows.length,
+          outputRowCount: upstreamData.rows.length,
+          state: 'confirmed',
+          error: undefined,
+        });
+        // Output just changed (forwarded upstream), so downstream is now stale.
+        clearNodeStale(nodeId);
+        markChildrenStale(nodeId);
+      }
       setError(null);
       return;
     }
+
+    // Reaching the execution path means config is complete; clear the
+    // pass-through key so a later return to an incomplete config re-writes.
+    lastPassThroughKey.current = '';
 
     const execKey = JSON.stringify({
       config,
@@ -143,7 +164,12 @@ export function useNodeExecution(
       runRequest,
     });
 
-    if (execKey === lastExecKey.current) return;
+    if (execKey === lastExecKey.current) {
+      // Inputs are unchanged, so this node won't recompute and its current
+      // output is still valid — clear any stale mark a parent left on it.
+      clearNodeStale(nodeId);
+      return;
+    }
     lastExecKey.current = execKey;
 
     const baseDebounce = isNativelySupported(nodeType) ? NATIVE_DEBOUNCE_MS : DEBOUNCE_MS;
@@ -169,6 +195,11 @@ export function useNodeExecution(
         error: undefined,
       });
 
+      // This node is recomputing, so it's no longer stale; its output is about
+      // to change, so light up the immediate downstream as stale (the wavefront).
+      clearNodeStale(nid);
+      markChildrenStale(nid);
+
       (async () => {
         try {
           const result: DataFrame = await executeNode(ntype, up, cfg, code);
@@ -192,6 +223,9 @@ export function useNodeExecution(
             state: 'error',
             error: message,
           });
+          // Output didn't change on failure, so downstream isn't actually
+          // invalidated — undo the optimistic stale mark from run start.
+          clearChildrenStale(nid);
         } finally {
           if (thisRunId === runIdRef.current) {
             setIsExecuting(false);
@@ -220,6 +254,9 @@ export function useNodeExecution(
     executionDebounceBypassUntil,
     setNodeOutput,
     updateNode,
+    markChildrenStale,
+    clearChildrenStale,
+    clearNodeStale,
   ]);
 
   return {
