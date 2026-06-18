@@ -1,10 +1,6 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
-import { spawn } from 'child_process';
 import express, { Request, Response } from 'express';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { renderChart } from '../lib/chartWorkerPool.ts';
 
 const router = express.Router();
 
@@ -50,53 +46,6 @@ function evictCacheIfNeeded(): void {
   for (let i = 0; i < toRemove; i++) {
     chartCache.delete(entries[i][0]);
   }
-}
-
-function runRenderChart(payload: Record<string, unknown>): Promise<{ image: string } | { error: string }> {
-  return new Promise((resolve) => {
-    const scriptPath = path.join(__dirname, '..', 'scripts', 'render_chart.py');
-    const proc = spawn('python3', [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    proc.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk;
-    });
-    proc.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk;
-    });
-    const input = JSON.stringify(payload);
-    proc.stdin?.write(input, (err) => {
-      if (err) {
-        proc.kill();
-        resolve({ error: (err as Error).message });
-        return;
-      }
-      proc.stdin?.end();
-    });
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        resolve({ error: stderr || `Python script exited with code ${code}` });
-        return;
-      }
-      try {
-        const result = JSON.parse(stdout) as { image?: string; error?: string };
-        if (result.error) {
-          resolve({ error: result.error });
-          return;
-        }
-        if (typeof result.image === 'string') {
-          resolve({ image: result.image });
-          return;
-        }
-        resolve({ error: 'Invalid response from chart script' });
-      } catch {
-        resolve({ error: 'Invalid JSON from chart script' });
-      }
-    });
-    proc.on('error', (err) => {
-      resolve({ error: (err as Error).message });
-    });
-  });
 }
 
 interface RenderChartBody {
@@ -145,7 +94,7 @@ router.post('/render-chart', async (req: Request, res: Response) => {
     return res.json({ image: cached.image });
   }
 
-  const result = await runRenderChart(payload);
+  const result = await renderChart(payload);
   if ('error' in result) {
     return res.status(502).json({ error: result.error });
   }

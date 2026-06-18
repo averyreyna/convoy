@@ -1,6 +1,7 @@
 import type { DataFrame } from '@/types';
 import { generateNodeCode } from '@/lib/codeGenerators';
 import { runPythonWithDataFrame } from '@/lib/pythonRunner';
+import { executeNodeNative } from '@/lib/nativeExecutors';
 
 export type { FilterConfig } from './filterExecutor';
 export type { GroupByConfig } from './groupByExecutor';
@@ -10,8 +11,8 @@ export type { TransformConfig } from './transformExecutor';
 export type { ComputedColumnConfig } from './computedColumnExecutor';
 export type { ReshapeConfig } from './reshapeExecutor';
 
-/** Node types that perform a transformation and run through Python */
-const PYTHON_NODE_TYPES = new Set([
+/** Node types that perform a data transformation (vs. pass-through). */
+const TRANSFORM_NODE_TYPES = new Set([
   'filter',
   'groupBy',
   'sort',
@@ -22,8 +23,11 @@ const PYTHON_NODE_TYPES = new Set([
 ]);
 
 /**
- * Execute a node's transformation via in-browser Python (Pyodide).
- * Generates or uses custom Python code, runs it with the input dataframe as `df`, returns the result.
+ * Execute a node's transformation.
+ *
+ * Tries the native TypeScript engine first (no serialization, no WASM); for the
+ * custom `transform` node and any computedColumn expression the native engine
+ * can't parse, falls back to running the generated/custom pandas code in Pyodide.
  */
 export async function executeNode(
   nodeType: string,
@@ -31,23 +35,20 @@ export async function executeNode(
   config: Record<string, unknown>,
   customCode?: string
 ): Promise<DataFrame> {
-  if (!PYTHON_NODE_TYPES.has(nodeType)) {
+  if (!TRANSFORM_NODE_TYPES.has(nodeType)) {
     return input;
+  }
+
+  // The custom transform node runs arbitrary user pandas, so it never goes native.
+  if (nodeType !== 'transform') {
+    const native = executeNodeNative(nodeType, input, config);
+    if (native) return native;
   }
 
   const code =
     nodeType === 'transform' && customCode && customCode.trim() !== ''
       ? customCode
       : generateNodeCode(nodeType, config);
-
-  if (nodeType === 'transform') {
-    console.log('[Convoy executeNode] transform', {
-      inputRows: input.rows.length,
-      inputCols: input.columns.map((c) => c.name),
-      usedCustomCode: !!(customCode && customCode.trim() !== ''),
-      codePreview: (code || '').slice(0, 200),
-    });
-  }
 
   return runPythonWithDataFrame(input, code);
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,21 +22,19 @@ type AiSummarizeDataNodeProps = NodeProps & {
 };
 
 function useFirstDataSourceOutput() {
-  const nodes = useCanvasStore((s) => s.nodes);
-  const nodeOutputs = useDataStore((s) => s.nodeOutputs);
-
-  return useMemo(() => {
-    const dataSourceNode = nodes.find(
+  // Select the id of the first confirmed data source (a primitive), then its
+  // output by id — so this only re-renders when that id or its output changes,
+  // not on every node mutation or any other node's output update.
+  const dataSourceId = useCanvasStore((s) =>
+    s.nodes.find(
       (n) => n.type === 'dataSource' && (n.data as { state?: string })?.state === 'confirmed'
-    );
-    if (!dataSourceNode) return undefined;
-    return nodeOutputs[dataSourceNode.id];
-  }, [nodes, nodeOutputs]);
+    )?.id
+  );
+  return useDataStore((s) => (dataSourceId != null ? s.nodeOutputs[dataSourceId] : undefined));
 }
 
 export function AiSummarizeDataNode({ id, data, selected }: AiSummarizeDataNodeProps) {
   const addNode = useCanvasStore((s) => s.addNode);
-  const nodes = useCanvasStore((s) => s.nodes);
   const updateNode = useNodeUpdate<AiSummarizeDataNodeData>(id);
 
   const [loading, setLoading] = useState(false);
@@ -58,8 +56,7 @@ export function AiSummarizeDataNode({ id, data, selected }: AiSummarizeDataNodeP
     [updateNode]
   );
 
-  const hasData = Boolean(pipelineData && pipelineData.columns?.length);
-  const canSummarize = hasData;
+  const canSummarize = Boolean(pipelineData && pipelineData.columns?.length);
 
   const handleSummarize = useCallback(async () => {
     if (!canSummarize || !pipelineData) return;
@@ -77,7 +74,7 @@ export function AiSummarizeDataNode({ id, data, selected }: AiSummarizeDataNodeP
         prompt: prompt.trim() || undefined,
       });
 
-      const sourceNode = nodes.find((n) => n.id === id);
+      const sourceNode = useCanvasStore.getState().nodes.find((n) => n.id === id);
       const position = sourceNode?.position
         ? { x: sourceNode.position.x + NOTE_OFFSET_X, y: sourceNode.position.y }
         : { x: 120, y: 120 };
@@ -98,14 +95,13 @@ export function AiSummarizeDataNode({ id, data, selected }: AiSummarizeDataNodeP
       });
     } catch (err) {
       console.error('Summarize data failed:', err);
-      setError(err instanceof Error ? err.message : 'Summarize failed. Please try again.');
-      updateNode({
-        error: err instanceof Error ? err.message : 'Summarize failed. Please try again.',
-      });
+      const message = err instanceof Error ? err.message : 'Summarize failed. Please try again.';
+      setError(message);
+      updateNode({ error: message });
     } finally {
       setLoading(false);
     }
-  }, [canSummarize, pipelineData, prompt, id, nodes, addNode, updateNode]);
+  }, [canSummarize, pipelineData, prompt, id, addNode, updateNode]);
 
   return (
     <BaseNode
@@ -120,7 +116,7 @@ export function AiSummarizeDataNode({ id, data, selected }: AiSummarizeDataNodeP
       errorMessage={data.error}
     >
       <div className="space-y-3">
-        {!hasData && (
+        {!canSummarize && (
           <p className={cn(caption, 'text-amber-600')}>
             Connect a node (e.g. Data Source or any node with output) to summarize, or load a data source and run the pipeline.
           </p>

@@ -3,6 +3,7 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { useUpstreamData } from './useUpstreamData';
 import { executeNode } from '@/lib/nodeExecutors';
+import { isNativelySupported } from '@/lib/nativeExecutors';
 import type { DataFrame } from '@/types';
 
 /**
@@ -68,6 +69,9 @@ function isConfigComplete(
 }
 
 const DEBOUNCE_MS = 400;
+// Native nodes execute synchronously and skip the Pyodide queue, so they only
+// need a short window to coalesce rapid edits rather than the full Python debounce.
+const NATIVE_DEBOUNCE_MS = 80;
 
 // hook that manages execution of a transformation node
 // uses cancellation and run id so only the latest run updates the store
@@ -120,16 +124,6 @@ export function useNodeExecution(
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      if (nodeType === 'transform') {
-        console.log('[Convoy useNodeExecution] transform skipped: config incomplete', {
-          nodeId,
-          hasUpstreamData: !!upstreamData,
-          isConfirmed,
-          customCodeArg: customCode === undefined ? 'undefined' : `"${String(customCode).slice(0, 80)}..."`,
-          configKeys: Object.keys(config),
-          configCustomCode: config.customCode === undefined ? 'undefined' : typeof config.customCode,
-        });
-      }
       setNodeOutput(nodeId, upstreamData);
       updateNode(nodeId, {
         inputRowCount: upstreamData.rows.length,
@@ -152,7 +146,8 @@ export function useNodeExecution(
     if (execKey === lastExecKey.current) return;
     lastExecKey.current = execKey;
 
-    const debounceMs = executionDebounceBypassUntil > Date.now() ? 0 : DEBOUNCE_MS;
+    const baseDebounce = isNativelySupported(nodeType) ? NATIVE_DEBOUNCE_MS : DEBOUNCE_MS;
+    const debounceMs = executionDebounceBypassUntil > Date.now() ? 0 : baseDebounce;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
@@ -165,7 +160,6 @@ export function useNodeExecution(
 
       runIdRef.current += 1;
       const thisRunId = runIdRef.current;
-      let cancelled = false;
 
       setIsExecuting(true);
       setError(null);
@@ -175,24 +169,11 @@ export function useNodeExecution(
         error: undefined,
       });
 
-      if (ntype === 'transform') {
-        console.log('[Convoy useNodeExecution] transform executing', {
-          nodeId: nid,
-          inputRows: up.rows.length,
-          customCodeArg: code === undefined ? 'undefined' : `"${String(code).slice(0, 120)}..."`,
-          configCustomCode: cfg.customCode === undefined ? 'undefined' : `"${String(cfg.customCode).slice(0, 120)}..."`,
-        });
-      }
-
       (async () => {
         try {
           const result: DataFrame = await executeNode(ntype, up, cfg, code);
 
-          if (cancelled || thisRunId !== runIdRef.current) return;
-
-          if (ntype === 'transform') {
-            console.log('[Convoy useNodeExecution] transform success', { nodeId: nid, outputRows: result.rows.length });
-          }
+          if (thisRunId !== runIdRef.current) return;
 
           setNodeOutput(nid, result);
           updateNode(nid, {
@@ -203,12 +184,9 @@ export function useNodeExecution(
           });
           setError(null);
         } catch (err) {
-          if (cancelled || thisRunId !== runIdRef.current) return;
+          if (thisRunId !== runIdRef.current) return;
 
           const message = err instanceof Error ? err.message : 'Execution failed';
-          if (ntype === 'transform') {
-            console.log('[Convoy useNodeExecution] transform error', { nodeId: nid, error: message });
-          }
           setError(message);
           updateNode(nid, {
             state: 'error',

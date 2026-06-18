@@ -4,23 +4,12 @@
  * All node types use Python; variable name for the active dataframe is "df".
  */
 
-const PYTHON_NODE_TYPES = new Set([
-  'filter',
-  'groupBy',
-  'sort',
-  'select',
-  'transform',
-  'chart',
-  'dataSource',
-  'computedColumn',
-  'reshape',
-]);
-
 /**
  * Returns the Monaco editor language for a given node type.
+ * All node types generate Python (pandas/matplotlib).
  */
-export function getEditorLanguage(nodeType: string): string {
-  return PYTHON_NODE_TYPES.has(nodeType) ? 'python' : 'python';
+export function getEditorLanguage(_nodeType: string): string {
+  return 'python';
 }
 
 export function generateNodeCode(

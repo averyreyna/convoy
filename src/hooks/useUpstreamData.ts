@@ -10,9 +10,10 @@ import type { DataFrame } from '@/types';
  * looks up that node's output in the data store.
  */
 export function useUpstreamData(nodeId: string): DataFrame | undefined {
-  const edges = useCanvasStore((s) => s.edges);
-  const incomingEdge = edges.find((e) => e.target === nodeId);
-  const sourceId = incomingEdge?.source;
+  // Select just this node's incoming source id (a primitive) rather than the
+  // whole edges array, so the node only re-renders when its own upstream link
+  // changes — not on every unrelated edge add/remove/select.
+  const sourceId = useCanvasStore((s) => s.edges.find((e) => e.target === nodeId)?.source);
   const upstreamOutput = useDataStore((s) =>
     sourceId != null ? s.nodeOutputs[sourceId] : undefined
   );

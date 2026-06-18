@@ -18,7 +18,9 @@ Before you begin, ensure you have the following installed:
   pip install -r server/scripts/requirements.txt
   ```
 
-  There is no client-side fallback for charts.
+  There is no client-side fallback for charts. Charts are rendered by a small pool of persistent Python workers; set `CONVOY_CHART_WORKERS` to change the pool size (default `2`).
+
+  Note: data transform nodes (filter, sort, select, group by, reshape, and most computed columns) run natively in the browser and do **not** require system Python. In-browser Python (Pyodide, loaded automatically) is used only for custom transform code and computed-column expressions outside the supported subset.
 
 ## Local Development
 

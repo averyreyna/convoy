@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
 """
-Render a chart with matplotlib. Reads JSON from stdin, writes JSON to stdout.
-Used by the Convoy server for in-app chart preview.
+Render a chart with matplotlib. Used by the Convoy server for in-app chart preview.
 
-Stdin: { "chartType", "xAxis", "yAxis", "colorBy?", "data": [...], "width", "height", "format": "png"|"svg" }
-Stdout: { "image": "<base64 or SVG string>" } or { "error": "..." }
+Two modes:
+  * one-shot (default): reads a single JSON payload from stdin, writes one JSON
+    result to stdout, exits. Kept for direct/CLI use and backward compatibility.
+  * worker (`--serve`): a long-lived process that reads newline-delimited JSON
+    requests from stdin and writes newline-delimited JSON responses to stdout,
+    one per line. matplotlib is imported once at startup, so each render avoids
+    interpreter + library cold-start. JSON encoding escapes embedded newlines
+    (e.g. inside SVG), so line framing is safe in both directions.
+
+Payload: { "chartType", "xAxis", "yAxis", "colorBy?", "data": [...], "width", "height", "format": "png"|"svg" }
+Result:  { "image": "<base64 or SVG string>" } or { "error": "..." }
 """
 import json
 import sys
 import base64
 import io
+import contextlib
 
 # non-interactive backend for server use
 import matplotlib
@@ -45,13 +54,12 @@ def get_str(d, key):
     return str(v)
 
 
-def main():
-    try:
-        payload = json.load(sys.stdin)
-    except json.JSONDecodeError as e:
-        print(json.dumps({"error": f"Invalid JSON: {e}"}))
-        sys.exit(0)
+def build_response(payload):
+    """Render a chart from a payload dict and return a result dict.
 
+    Returns {"image": ...} on success or {"error": ...} on any failure. Never
+    prints or exits, so it is safe to call repeatedly from the worker loop.
+    """
     chart_type = (payload.get("chartType") or "bar").lower()
     x_axis = payload.get("xAxis") or ""
     y_axis = payload.get("yAxis") or ""
@@ -64,23 +72,19 @@ def main():
         fmt = "png"
 
     if not x_axis or not y_axis:
-        print(json.dumps({"error": "Missing xAxis or yAxis"}))
-        sys.exit(0)
+        return {"error": "Missing xAxis or yAxis"}
     if not data or not isinstance(data, list):
-        print(json.dumps({"error": "Missing or invalid data"}))
-        sys.exit(0)
+        return {"error": "Missing or invalid data"}
 
     # Extract column arrays from list of dicts
     try:
         x_vals = [get_str(d, x_axis) if not isinstance(d.get(x_axis), (int, float)) else d.get(x_axis) for d in data]
         y_vals = [get_num(d, y_axis) for d in data]
     except Exception as e:
-        print(json.dumps({"error": f"Data extraction failed: {e}"}))
-        sys.exit(0)
+        return {"error": f"Data extraction failed: {e}"}
 
     if not y_vals:
-        print(json.dumps({"error": "No valid y values"}))
-        sys.exit(0)
+        return {"error": "No valid y values"}
 
     # Figure size in inches (matplotlib uses ~100 dpi by default for display)
     dpi = 100
@@ -165,19 +169,59 @@ def main():
 
     plt.tight_layout()
 
-    buf = io.BytesIO()
-    if fmt == 'svg':
-        fig.savefig(buf, format='svg', bbox_inches='tight', facecolor='white')
-        buf.seek(0)
-        svg_str = buf.read().decode('utf-8')
-        print(json.dumps({"image": svg_str}))
-    else:
+    try:
+        buf = io.BytesIO()
+        if fmt == 'svg':
+            fig.savefig(buf, format='svg', bbox_inches='tight', facecolor='white')
+            return {"image": buf.getvalue().decode('utf-8')}
         fig.savefig(buf, format='png', bbox_inches='tight', facecolor='white', dpi=dpi)
-        buf.seek(0)
-        b64 = base64.b64encode(buf.read()).decode('ascii')
-        print(json.dumps({"image": f"data:image/png;base64,{b64}"}))
-    plt.close(fig)
+        b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+        return {"image": f"data:image/png;base64,{b64}"}
+    finally:
+        # Always release the figure so a long-lived worker doesn't leak memory.
+        plt.close(fig)
+
+
+def respond(payload):
+    """Render and return a result dict, converting any unexpected error to a result."""
+    try:
+        return build_response(payload)
+    except Exception as e:  # defensive: keep the worker alive on bad input
+        return {"error": f"Render failed: {e}"}
+
+
+def main():
+    """One-shot mode: a single payload on stdin, a single result on stdout."""
+    try:
+        payload = json.load(sys.stdin)
+    except json.JSONDecodeError as e:
+        print(json.dumps({"error": f"Invalid JSON: {e}"}))
+        return
+    print(json.dumps(respond(payload)))
+
+
+def serve():
+    """Worker mode: newline-delimited JSON requests in, results out, one per line."""
+    # Responses go to the real stdout; guard rendering so any stray library
+    # output to stdout cannot corrupt the line-framed protocol.
+    out = sys.stdout
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+            with contextlib.redirect_stdout(sys.stderr):
+                result = respond(payload)
+        except json.JSONDecodeError as e:
+            result = {"error": f"Invalid JSON: {e}"}
+        out.write(json.dumps(result))
+        out.write("\n")
+        out.flush()
 
 
 if __name__ == '__main__':
-    main()
+    if '--serve' in sys.argv[1:]:
+        serve()
+    else:
+        main()

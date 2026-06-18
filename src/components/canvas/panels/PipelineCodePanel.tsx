@@ -3,6 +3,7 @@ import { diffLines, type Change } from 'diff';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { generateNodeCode } from '@/lib/codeGenerators';
+import { parseNodeCode } from '@/lib/codeParsers';
 import {
   topologicalSortPipeline,
   exportAsPython,
@@ -274,11 +275,22 @@ export function PipelineCodePanel() {
         setDraftCells((prev) =>
           prev.map((d) => (d.id === nodeId ? { ...d, code: value } : d))
         );
+        return;
+      }
+      // Bidirectional sync: try to parse the edited code back into structured
+      // config. On success the node config is the single source of truth, so we
+      // write the fields and clear the customCode override (and leave code mode,
+      // since the canvas can render structured controls again). On failure the
+      // code is opaque custom code — keep it verbatim and surface it in code mode.
+      const node = nodes.find((n) => n.id === nodeId);
+      const parsed = node ? parseNodeCode(node.type as string, value) : null;
+      if (parsed) {
+        updateNode(nodeId, { ...parsed, customCode: undefined, isCodeMode: false });
       } else {
-        updateNode(nodeId, { customCode: value || undefined });
+        updateNode(nodeId, { customCode: value || undefined, isCodeMode: true });
       }
     },
-    [updateNode]
+    [nodes, updateNode]
   );
 
   const handleRevertCell = useCallback(

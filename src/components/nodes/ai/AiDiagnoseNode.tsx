@@ -24,7 +24,6 @@ type AiDiagnoseNodeProps = NodeProps & {
 
 export function AiDiagnoseNode({ id, data, selected }: AiDiagnoseNodeProps) {
   const addNode = useCanvasStore((s) => s.addNode);
-  const nodes = useCanvasStore((s) => s.nodes);
   const updateNode = useNodeUpdate<AiDiagnoseNodeData>(id);
 
   const [loading, setLoading] = useState(false);
@@ -45,8 +44,7 @@ export function AiDiagnoseNode({ id, data, selected }: AiDiagnoseNodeProps) {
     [updateNode]
   );
 
-  const hasContext = contextNodeIds.length > 0;
-  const canDiagnose = hasContext;
+  const canDiagnose = contextNodeIds.length > 0;
 
   const handleDebug = useCallback(async () => {
     if (!canDiagnose) return;
@@ -68,7 +66,7 @@ export function AiDiagnoseNode({ id, data, selected }: AiDiagnoseNodeProps) {
         pipelineContext,
       });
 
-      const sourceNode = nodes.find((n) => n.id === id);
+      const sourceNode = useCanvasStore.getState().nodes.find((n) => n.id === id);
       const position = sourceNode?.position
         ? { x: sourceNode.position.x + NOTE_OFFSET_X, y: sourceNode.position.y }
         : { x: 120, y: 120 };
@@ -94,7 +92,7 @@ export function AiDiagnoseNode({ id, data, selected }: AiDiagnoseNodeProps) {
     } finally {
       setLoading(false);
     }
-  }, [canDiagnose, contextNodeIds, question, upstreamData, pipelineContext, id, nodes, addNode, updateNode]);
+  }, [canDiagnose, contextNodeIds, question, upstreamData, pipelineContext, id, addNode, updateNode]);
 
   return (
     <BaseNode
@@ -108,12 +106,12 @@ export function AiDiagnoseNode({ id, data, selected }: AiDiagnoseNodeProps) {
       errorMessage={data.error}
     >
       <div className="space-y-3">
-        {!hasContext && (
+        {!canDiagnose && (
           <p className={cn(caption, 'text-amber-600')}>
             Connect to a node to diagnose.
           </p>
         )}
-        {hasContext && (
+        {canDiagnose && (
           <>
             <div>
               <label className="sr-only">Optional question (e.g. Why is output empty?)</label>

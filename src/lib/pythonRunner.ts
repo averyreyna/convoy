@@ -10,19 +10,49 @@ import type { DataFrame, Column } from '@/types';
 type PyodideInstance = Awaited<ReturnType<typeof loadPyodide>>;
 let pyodidePromise: Promise<PyodideInstance> | null = null;
 
+/**
+ * Phase 0 perf instrumentation. Disabled by default; enable in the browser
+ * console with `window.__CONVOY_PERF__ = true` to log a per-run breakdown of
+ * Pyodide cold-start, JSON serialize, exec, and deserialize timings. This is a
+ * temporary baseline aid for the native-execution migration.
+ */
+function perfEnabled(): boolean {
+  return typeof window !== 'undefined' && (window as { __CONVOY_PERF__?: boolean }).__CONVOY_PERF__ === true;
+}
+
+function perfLog(label: string, ms: number, extra?: Record<string, unknown>): void {
+  if (perfEnabled()) {
+    console.log(`[Convoy perf] ${label}: ${ms.toFixed(1)}ms`, extra ?? '');
+  }
+}
+
 function getPyodide(): Promise<PyodideInstance> {
   if (!pyodidePromise) {
+    const coldStart = performance.now();
     pyodidePromise = (async () => {
       const p = await loadPyodide({
         indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/',
         fullStdLib: false,
       });
       await p.loadPackage('pandas');
-      await p.loadPackage('matplotlib');
+      perfLog('pyodide cold-start (load + pandas)', performance.now() - coldStart);
       return p;
     })();
   }
   return pyodidePromise;
+}
+
+/**
+ * matplotlib is only needed by full-pipeline scripts (charts render server-side),
+ * so it is loaded lazily on first use rather than as part of every cold-start.
+ */
+let matplotlibPromise: Promise<void> | null = null;
+
+function ensureMatplotlib(pyodide: PyodideInstance): Promise<void> {
+  if (!matplotlibPromise) {
+    matplotlibPromise = pyodide.loadPackage('matplotlib').then(() => undefined);
+  }
+  return matplotlibPromise;
 }
 
 /** Single-job queue: only one Python run at a time. */
@@ -57,14 +87,7 @@ async function runPythonWithDataFrameImpl(
   input: DataFrame,
   code: string
 ): Promise<DataFrame> {
-  console.log('[Convoy runPythonWithDataFrame]', {
-    inputRows: input.rows.length,
-    inputCols: input.columns.map((c) => c.name),
-    codePreview: code.slice(0, 300),
-  });
-
   const pyodide = await getPyodide();
-  if (!pyodide) throw new Error('Pyodide not loaded');
 
   pyodide.globals.set('input_json', JSON.stringify(input));
   pyodide.globals.set('user_code', code);
@@ -90,36 +113,25 @@ _result_ = {"columns": cols, "rows": rows}
 _result_
 `;
 
-  try {
-    const result = await pyodide.runPythonAsync(runScript);
-    if (result === undefined || result === null) {
-      throw new Error('Python code did not produce a result');
-    }
-
-    const output = result.toJs({
-      dict_converter: Object.fromEntries,
-      create_proxies: false,
-    }) as { columns: { name: string; type: string }[]; rows: Record<string, unknown>[] };
-
-    console.log('[Convoy runPythonWithDataFrame] success', {
-      outputRows: output.rows.length,
-      outputCols: output.columns.map((c) => c.name),
-    });
-
-    const columns: Column[] = output.columns.map((c) => ({
-      name: c.name,
-      type: (c.type === 'number' || c.type === 'boolean' || c.type === 'date' ? c.type : 'string') as Column['type'],
-    }));
-
-    return {
-      columns,
-      rows: output.rows,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.log('[Convoy runPythonWithDataFrame] error', { message });
-    throw err;
+  const result = await pyodide.runPythonAsync(runScript);
+  if (result === undefined || result === null) {
+    throw new Error('Python code did not produce a result');
   }
+
+  const output = result.toJs({
+    dict_converter: Object.fromEntries,
+    create_proxies: false,
+  }) as { columns: { name: string; type: string }[]; rows: Record<string, unknown>[] };
+
+  const columns: Column[] = output.columns.map((c) => ({
+    name: c.name,
+    type: (c.type === 'number' || c.type === 'boolean' || c.type === 'date' ? c.type : 'string') as Column['type'],
+  }));
+
+  return {
+    columns,
+    rows: output.rows,
+  };
 }
 
 /**
@@ -134,7 +146,9 @@ export async function runFullPipelineScript(script: string): Promise<void> {
 
 async function runFullPipelineScriptImpl(script: string): Promise<void> {
   const pyodide = await getPyodide();
-  if (!pyodide) throw new Error('Pyodide not loaded');
+
+  // Full pipeline scripts may chart with matplotlib; load it on demand.
+  await ensureMatplotlib(pyodide);
 
   pyodide.globals.set('user_script', script);
 

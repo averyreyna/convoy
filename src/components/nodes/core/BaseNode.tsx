@@ -63,7 +63,6 @@ export const BaseNode = memo(function BaseNode({
   isExecuting = false,
   detailMode,
 }: BaseNodeProps) {
-  const nodes = useCanvasStore((s) => s.nodes);
   const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
   const zoom = useCanvasStore((s) => s.viewport.zoom);
 
@@ -102,7 +101,12 @@ export const BaseNode = memo(function BaseNode({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
+              // Read nodes lazily so this component doesn't subscribe to the
+              // whole nodes array (which would re-render every node on any change).
+              const selectedIds = useCanvasStore
+                .getState()
+                .nodes.filter((n) => n.selected)
+                .map((n) => n.id);
               const next = selectedIds.includes(nodeId)
                 ? selectedIds.filter((id) => id !== nodeId)
                 : [...selectedIds, nodeId];
