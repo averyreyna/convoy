@@ -171,6 +171,9 @@ function generateReshapeCode(config: Record<string, unknown>): string {
 
 function generateChartCode(config: Record<string, unknown>): string {
   const { chartType, xAxis, yAxis } = config;
+  const figWidth = typeof config.figWidth === 'number' ? config.figWidth : 10;
+  const figHeight = typeof config.figHeight === 'number' ? config.figHeight : 6;
+  const figsize = `(${figWidth}, ${figHeight})`;
 
   if (!xAxis || !yAxis) {
     return `# Chart node — configure axes to generate matplotlib code`;
@@ -181,7 +184,7 @@ function generateChartCode(config: Record<string, unknown>): string {
   switch (type) {
     case 'bar':
       return `import matplotlib.pyplot as plt
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=${figsize})
 plt.bar(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
@@ -190,7 +193,7 @@ plt.tight_layout()
 plt.show()`;
     case 'line':
       return `import matplotlib.pyplot as plt
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=${figsize})
 plt.plot(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
@@ -199,7 +202,7 @@ plt.tight_layout()
 plt.show()`;
     case 'scatter':
       return `import matplotlib.pyplot as plt
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=${figsize})
 plt.scatter(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")
@@ -208,14 +211,14 @@ plt.tight_layout()
 plt.show()`;
     case 'pie':
       return `import matplotlib.pyplot as plt
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=${figsize})
 plt.pie(df["${yAxis}"], labels=df["${xAxis}"], autopct="%1.1f%%")
 plt.title("${yAxis} by ${xAxis}")
 plt.tight_layout()
 plt.show()`;
     case 'area':
       return `import matplotlib.pyplot as plt
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=${figsize})
 y_vals = pd.to_numeric(df["${yAxis}"], errors="coerce")
 plt.fill_between(range(len(df)), y_vals, alpha=0.3)
 plt.plot(range(len(df)), y_vals)
@@ -226,7 +229,7 @@ plt.tight_layout()
 plt.show()`;
     default:
       return `import matplotlib.pyplot as plt
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=${figsize})
 plt.bar(df["${xAxis}"], df["${yAxis}"])
 plt.xlabel("${xAxis}")
 plt.ylabel("${yAxis}")

@@ -1,11 +1,13 @@
 import type { Node } from '@xyflow/react';
 import type { Change } from 'diff';
 import { diffLines } from 'diff';
-import Editor from '@monaco-editor/react';
 import { ChevronDown, ChevronRight, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { SchemaDiagnostic } from '@/lib/inferSchema';
+import type { Schema, SchemaDiagnostic } from '@/lib/inferSchema';
+import { unknownSchema } from '@/lib/inferSchema';
+import type { CellLiveEval } from '@/lib/liveEval';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { PipelineCellEditor } from './PipelineCellEditor';
 import {
   button,
   caption,
@@ -21,28 +23,6 @@ import {
   notebookCellSelected,
   notebookCellStale,
 } from '@/flank';
-
-const MIN_EDITOR_HEIGHT = 52;
-const MAX_EDITOR_HEIGHT = 168;
-
-const EDITOR_OPTIONS = {
-  readOnly: false,
-  minimap: { enabled: false },
-  fontSize: 10,
-  lineNumbers: 'off' as const,
-  folding: false,
-  scrollBeyondLastLine: false,
-  automaticLayout: true,
-  padding: { top: 4, bottom: 4 },
-  wordWrap: 'on' as const,
-  overviewRulerLanes: 0,
-  hideCursorInOverviewRuler: true,
-  scrollbar: {
-    vertical: 'auto' as const,
-    horizontal: 'hidden' as const,
-    verticalScrollbarSize: 6,
-  },
-} as const;
 
 export type PipelineCellKind = 'code' | 'aiConversation';
 
@@ -75,6 +55,8 @@ interface PipelineCellListProps {
   cells: PipelineCellViewModel[];
   nodes: Node[];
   diagnosticsByCellId: Map<string, SchemaDiagnostic[]>;
+  inputSchemaByCellId: Map<string, Schema>;
+  evalStateByCellId: Map<string, CellLiveEval>;
   baselineByNodeId: Record<string, BaselineSnapshot>;
   selectedNodeIds: Set<string>;
   focusedCellNodeId: string | null;
@@ -94,6 +76,8 @@ export function PipelineCellList({
   cells,
   nodes,
   diagnosticsByCellId,
+  inputSchemaByCellId,
+  evalStateByCellId,
   baselineByNodeId,
   selectedNodeIds,
   focusedCellNodeId,
@@ -238,48 +222,17 @@ export function PipelineCellList({
                   {cell.label} ({cell.nodeType})
                 </span>
               </div>
-              <div className="overflow-hidden rounded-b-md border-0 border-gray-200">
-                <Editor
-                  height={Math.min(
-                    Math.max(MIN_EDITOR_HEIGHT, cell.code.split('\n').length * 16),
-                    MAX_EDITOR_HEIGHT
-                  )}
-                  language="python"
-                  value={cell.code}
-                  onChange={(value) => onCellCodeChange(cell.nodeId, value ?? '')}
-                  theme="vs-light"
-                  options={EDITOR_OPTIONS}
-                  onMount={(editor) => {
-                    const disposableFocus = editor.onDidFocusEditorWidget(() =>
-                      onActivateCell(cell.nodeId)
-                    );
-                    const disposableBlur = editor.onDidBlurEditorWidget(() =>
-                      onClearFocusedCell()
-                    );
-                    return () => {
-                      disposableFocus.dispose();
-                      disposableBlur.dispose();
-                    };
-                  }}
-                />
-              </div>
-              {diagnostics.length > 0 && (
-                <div className="space-y-0.5 border-t border-gray-100 px-2 py-1">
-                  {diagnostics.map((d, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        'flex items-start gap-1 text-[10px] leading-snug',
-                        d.severity === 'error' ? 'text-red-600' : 'text-amber-600'
-                      )}
-                      title={d.severity === 'error' ? 'Schema error' : 'Schema warning'}
-                    >
-                      <span aria-hidden>{d.severity === 'error' ? '⨯' : '⚠'}</span>
-                      <span className="min-w-0 flex-1 break-words">{d.message}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <PipelineCellEditor
+                cellId={cell.nodeId}
+                code={cell.code}
+                nodeType={cell.nodeType}
+                diagnostics={diagnostics}
+                inputSchema={inputSchemaByCellId.get(cell.nodeId) ?? unknownSchema}
+                evalState={evalStateByCellId.get(cell.nodeId)}
+                onActivateCell={() => onActivateCell(cell.nodeId)}
+                onClearFocusedCell={onClearFocusedCell}
+                onCodeChange={(value) => onCellCodeChange(cell.nodeId, value)}
+              />
               {hasCellDiff && (
                 <div className="border-t border-gray-100 bg-gray-50/80">
                   <button

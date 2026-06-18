@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { diffLines, type Change } from 'diff';
 import type { Column } from '@/types';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -16,13 +16,8 @@ import {
   downloadNotebook,
   copyAsJupyterCells,
 } from '@/lib/exportPipeline';
-import {
-  inferSchemaFromCode,
-  knownSchema,
-  unknownSchema,
-  type Schema,
-  type SchemaDiagnostic,
-} from '@/lib/inferSchema';
+import { inferPipelineCellSchemas, evaluateLineageLive, type CellLiveEval } from '@/lib/pipelineSchemaInference';
+import { unknownSchema } from '@/lib/inferSchema';
 import { runFullPipelineScript } from '@/lib/pythonRunner';
 import { importPipelineFromPython, editNodes } from '@/lib/api';
 import { buildEditNodesPipelineContext } from '@/lib/pipelineContext';
@@ -62,11 +57,14 @@ export function PipelineCodePanel() {
   const setBaselineForNodeIds = useCanvasStore((s) => s.setBaselineForNodeIds);
   const setPipelineRunInProgress = useCanvasStore((s) => s.setPipelineRunInProgress);
   const clearAllStale = useCanvasStore((s) => s.clearAllStale);
+  const markChildrenStale = useCanvasStore((s) => s.markChildrenStale);
   const baselineCode = useCanvasStore((s) => s.baselineCode);
   const baselineByNodeId = useCanvasStore((s) => s.baselineByNodeId);
   const aiNotebookCells = useCanvasStore((s) => s.aiNotebookCells);
   const addAiNotebookCell = useCanvasStore((s) => s.addAiNotebookCell);
   const nodeData = useDataStore((s) => s.nodeData);
+  const nodeOutputs = useDataStore((s) => s.nodeOutputs);
+  const outputVersions = useDataStore((s) => s.outputVersions);
 
   const [runError, setRunError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -154,47 +152,64 @@ export function PipelineCodePanel() {
     return [...nodeCells, ...draftAsCells];
   }, [nodeCells, draftCells]);
 
-  // Layer-2 wiring of the static schema semantics: thread inferSchema down the
-  // real graph lineage (parent edges, so branches stay correct) and collect each
-  // cell's diagnostics. Uses the cell's *code* so feedback updates live as the
-  // user types; the data source establishes the root schema from its loaded
-  // columns (its code is opaque pd.read_csv, so we can't recover columns from it).
-  const diagnosticsByCellId = useMemo(() => {
-    const parentOf = new Map<string, string>();
-    for (const e of edges) parentOf.set(e.target, e.source);
+  const { diagnosticsByCellId, inputSchemaByCellId, outputSchemaByCellId } = useMemo(
+    () =>
+      inferPipelineCellSchemas({
+        nodeCells,
+        draftCells,
+        edges,
+        nodes,
+        nodeData,
+      }),
+    [nodeCells, draftCells, edges, nodes, nodeData]
+  );
 
-    const schemaOut = new Map<string, Schema>();
-    const diagnostics = new Map<string, SchemaDiagnostic[]>();
+  const rootSchema = useMemo(() => {
+    const dataSourceCell = nodeCells.find((c) => c.nodeType === 'dataSource');
+    if (!dataSourceCell) return unknownSchema;
+    return outputSchemaByCellId.get(dataSourceCell.nodeId) ?? unknownSchema;
+  }, [nodeCells, outputSchemaByCellId]);
 
-    // nodeCells is topologically sorted, so a node's parent is always resolved first.
-    for (const cell of nodeCells) {
-      if (cell.nodeType === 'dataSource') {
-        const cols =
-          nodeData[cell.nodeId]?.columns ??
-          (nodes.find((n) => n.id === cell.nodeId)?.data as { columns?: Column[] } | undefined)?.columns;
-        schemaOut.set(cell.nodeId, cols?.length ? knownSchema(cols) : unknownSchema);
-        diagnostics.set(cell.nodeId, []);
-        continue;
+  const [evalStateByCellId, setEvalStateByCellId] = useState<Map<string, CellLiveEval>>(
+    () => new Map()
+  );
+  const liveEvalRunId = useRef(0);
+
+  useEffect(() => {
+    if (isRunning || codeCells.length === 0) return;
+
+    const realOutputByIndex = new Map<number, import('@/types').DataFrame>();
+    codeCells.forEach((cell, index) => {
+      const output = nodeOutputs[cell.nodeId];
+      if (output && output.rows.length > 0) {
+        realOutputByIndex.set(index, output);
+        return;
       }
-      const parentId = parentOf.get(cell.nodeId);
-      const input = (parentId && schemaOut.get(parentId)) || unknownSchema;
-      const { outputSchema, diagnostics: diags } = inferSchemaFromCode(input, cell.code, cell.nodeType);
-      schemaOut.set(cell.nodeId, outputSchema);
-      diagnostics.set(cell.nodeId, diags);
-    }
+      const data = nodeData[cell.nodeId];
+      if (data && data.rows.length > 0) {
+        realOutputByIndex.set(index, data);
+      }
+    });
 
-    // Draft cells (not yet graph nodes) chain off the last node cell's output.
-    let prev = nodeCells.length
-      ? schemaOut.get(nodeCells[nodeCells.length - 1].nodeId) ?? unknownSchema
-      : unknownSchema;
-    for (const draft of draftCells) {
-      const { outputSchema, diagnostics: diags } = inferSchemaFromCode(prev, draft.code);
-      diagnostics.set(draft.id, diags);
-      prev = outputSchema;
-    }
+    const runId = ++liveEvalRunId.current;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const results = await evaluateLineageLive(
+          codeCells.map((c) => ({ code: c.code, nodeType: c.nodeType })),
+          rootSchema,
+          { realOutputByIndex }
+        );
+        if (runId !== liveEvalRunId.current) return;
+        const next = new Map<string, CellLiveEval>();
+        codeCells.forEach((cell, i) => {
+          if (results[i]) next.set(cell.nodeId, results[i]);
+        });
+        setEvalStateByCellId(next);
+      })();
+    }, 400);
 
-    return diagnostics;
-  }, [nodeCells, draftCells, edges, nodes, nodeData]);
+    return () => clearTimeout(timer);
+  }, [codeCells, rootSchema, nodeData, nodeOutputs, outputVersions, isRunning]);
 
   const aiCells: AiConversationCellViewModel[] = useMemo(() => {
     if (!aiNotebookCells.length) return [];
@@ -418,8 +433,9 @@ export function PipelineCodePanel() {
       } else {
         updateNode(nodeId, { customCode: value || undefined, isCodeMode: true });
       }
+      markChildrenStale(nodeId);
     },
-    [nodes, updateNode]
+    [nodes, updateNode, markChildrenStale]
   );
 
   const handleRevertCell = useCallback(
@@ -755,6 +771,8 @@ export function PipelineCodePanel() {
             cells={cells}
             nodes={nodes}
             diagnosticsByCellId={diagnosticsByCellId}
+            inputSchemaByCellId={inputSchemaByCellId}
+            evalStateByCellId={evalStateByCellId}
             baselineByNodeId={baselineByNodeId}
             selectedNodeIds={selectedNodeIds}
             focusedCellNodeId={focusedCellNodeId}

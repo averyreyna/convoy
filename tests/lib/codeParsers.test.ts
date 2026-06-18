@@ -45,6 +45,28 @@ const roundTripCases: Array<{ type: string; config: Record<string, unknown> }> =
     type: 'reshape',
     config: { keyColumn: 'metric', valueColumn: 'amount', pivotColumns: ['q1', 'q2'] },
   },
+
+  // chart — matplotlib block (multi-line)
+  {
+    type: 'chart',
+    config: {
+      chartType: 'pie',
+      xAxis: 'category',
+      yAxis: 'value',
+      figWidth: 10,
+      figHeight: 6,
+    },
+  },
+  {
+    type: 'chart',
+    config: {
+      chartType: 'bar',
+      xAxis: 'x',
+      yAxis: 'y',
+      figWidth: 10,
+      figHeight: 10,
+    },
+  },
 ];
 
 describe('parseNodeCode round-trips generateNodeCode', () => {
@@ -52,7 +74,15 @@ describe('parseNodeCode round-trips generateNodeCode', () => {
     it(`${type}: ${JSON.stringify(config)}`, () => {
       const code = generateNodeCode(type, config);
       const parsed = parseNodeCode(type, code);
-      expect(parsed).toEqual(config);
+      if (type === 'chart') {
+        expect(parsed).toEqual({
+          figWidth: 10,
+          figHeight: 6,
+          ...config,
+        });
+      } else {
+        expect(parsed).toEqual(config);
+      }
     });
   }
 });
@@ -89,9 +119,9 @@ describe('parseNodeCode returns null for non-structured code', () => {
 describe('PARSEABLE_NODE_TYPES', () => {
   it('matches the documented set', () => {
     expect([...PARSEABLE_NODE_TYPES].sort()).toEqual(
-      ['computedColumn', 'filter', 'groupBy', 'reshape', 'select', 'sort'].sort()
+      ['chart', 'computedColumn', 'filter', 'groupBy', 'reshape', 'select', 'sort'].sort()
     );
     expect(isParseable('filter')).toBe(true);
-    expect(isParseable('chart')).toBe(false);
+    expect(isParseable('chart')).toBe(true);
   });
 });

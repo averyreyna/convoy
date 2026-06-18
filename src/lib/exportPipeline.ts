@@ -596,3 +596,39 @@ export function buildScriptForBrowserRun(
   const preamble = 'import pandas as pd\n\n';
   return preamble + body;
 }
+
+function isHoleCellCode(code: string): boolean {
+  const trimmed = code.trim();
+  return trimmed === '' || trimmed.startsWith('#');
+}
+
+/**
+ * Build a script for live eval with hole cells skipped (comment placeholders).
+ * Data source cells use the empty-frame trick when columnNames are provided.
+ */
+export function buildScriptForLiveEval(
+  cells: CellCode[],
+  upToIndex?: number,
+  columnNames?: string[]
+): string {
+  if (cells.length === 0) return '';
+  const end = upToIndex !== undefined ? Math.min(upToIndex + 1, cells.length) : cells.length;
+  const slice = cells.slice(0, end);
+  const body = slice
+    .map((c) => {
+      if (c.nodeType === 'dataSource') {
+        if (columnNames?.length) {
+          const cols = columnNames.map((n) => JSON.stringify(n)).join(', ');
+          return `# Data source (file load skipped in browser)\ndf = pd.DataFrame(columns=[${cols}])`;
+        }
+        return '# Data source (file load skipped in browser)\ndf = pd.DataFrame()';
+      }
+      if (isHoleCellCode(c.code)) {
+        return '# hole — skipped';
+      }
+      return c.code.trim();
+    })
+    .join('\n\n');
+  const preamble = 'import pandas as pd\n\n';
+  return preamble + body;
+}

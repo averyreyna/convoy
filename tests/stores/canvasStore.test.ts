@@ -81,4 +81,36 @@ describe('canvasStore', () => {
       expect(useCanvasStore.getState().edges).toHaveLength(0);
     });
   });
+
+  describe('staleNodeIds', () => {
+    beforeEach(() => {
+      useCanvasStore.setState({ staleNodeIds: {} });
+      useCanvasStore.getState().addNode(makeNode('a', 'filter'));
+      useCanvasStore.getState().addNode(makeNode('b', 'groupBy'));
+      useCanvasStore.getState().addEdgeToStore(makeEdge('e1', 'a', 'b'));
+    });
+
+    it('markChildrenStale marks direct downstream nodes', () => {
+      useCanvasStore.getState().markChildrenStale('a');
+      expect(useCanvasStore.getState().staleNodeIds).toEqual({ b: true });
+    });
+
+    it('clearNodeStale removes a node stale mark', () => {
+      useCanvasStore.getState().markChildrenStale('a');
+      useCanvasStore.getState().clearNodeStale('b');
+      expect(useCanvasStore.getState().staleNodeIds).toEqual({});
+    });
+
+    it('clearChildrenStale removes stale marks from direct children', () => {
+      useCanvasStore.getState().markChildrenStale('a');
+      useCanvasStore.getState().clearChildrenStale('a');
+      expect(useCanvasStore.getState().staleNodeIds).toEqual({});
+    });
+
+    it('clearAllStale clears every stale mark', () => {
+      useCanvasStore.getState().markChildrenStale('a');
+      useCanvasStore.getState().clearAllStale();
+      expect(useCanvasStore.getState().staleNodeIds).toEqual({});
+    });
+  });
 });

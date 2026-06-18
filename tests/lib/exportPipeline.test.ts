@@ -12,6 +12,7 @@ import {
   exportAsNotebookJson,
   buildScriptFromCellCodes,
   buildScriptForBrowserRun,
+  buildScriptForLiveEval,
   copyAsJupyterCells,
   type CellCode,
 } from '@/lib/exportPipeline';
@@ -357,6 +358,20 @@ describe('buildScriptForBrowserRun', () => {
     ];
     const out = buildScriptForBrowserRun(cells);
     expect(out).toContain('df = df[df["x"] > 0]');
+  });
+});
+
+describe('buildScriptForLiveEval', () => {
+  it('skips hole cells as comments', () => {
+    const cells: CellCode[] = [
+      { code: 'df = pd.read_csv("x.csv")', nodeType: 'dataSource' },
+      { code: '# placeholder', nodeType: 'transform' },
+      { code: 'df = df.head()', nodeType: 'transform' },
+    ];
+    const out = buildScriptForLiveEval(cells, undefined, ['a']);
+    expect(out).toContain('# hole — skipped');
+    expect(out).toContain('df = df.head()');
+    expect(out).not.toContain('# placeholder');
   });
 });
 

@@ -20,6 +20,8 @@ interface ChartPreviewModalProps {
   xAxis: string;
   yAxis: string;
   colorBy?: string;
+  figWidth?: number;
+  figHeight?: number;
   data: Record<string, unknown>[];
   columns: Column[];
 }
@@ -31,10 +33,15 @@ export function ChartPreviewModal({
   xAxis,
   yAxis,
   colorBy,
+  figWidth,
+  figHeight,
   data,
 }: ChartPreviewModalProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [isExportingSvg, setIsExportingSvg] = useState(false);
+
+  const renderWidth = Math.round((figWidth ?? 10) * 100);
+  const renderHeight = Math.round((figHeight ?? 6) * 100);
 
   const { image, isLoading, error } = useChartImage({
     chartType,
@@ -42,8 +49,8 @@ export function ChartPreviewModal({
     yAxis,
     colorBy,
     data,
-    width: 800,
-    height: 500,
+    width: renderWidth,
+    height: renderHeight,
     format: 'png',
   });
 
@@ -65,8 +72,8 @@ export function ChartPreviewModal({
         yAxis,
         colorBy,
         data,
-        width: 800,
-        height: 500,
+        width: renderWidth,
+        height: renderHeight,
         format: 'svg',
       });
       const blob = new Blob([svgImage], { type: 'image/svg+xml' });
@@ -79,7 +86,7 @@ export function ChartPreviewModal({
     } finally {
       setIsExportingSvg(false);
     }
-  }, [chartType, xAxis, yAxis, colorBy, data]);
+  }, [chartType, xAxis, yAxis, colorBy, data, renderWidth, renderHeight]);
 
   if (!isOpen) return null;
 

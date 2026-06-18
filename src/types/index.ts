@@ -60,6 +60,10 @@ export interface ChartNodeData extends BaseNodeData {
   xAxis?: string;
   yAxis?: string;
   colorBy?: string;
+  /** Matplotlib figure width in inches (default 10). */
+  figWidth?: number;
+  /** Matplotlib figure height in inches (default 6). */
+  figHeight?: number;
 }
 
 export interface ComputedColumnNodeData extends BaseNodeData {

@@ -58,6 +58,14 @@ describe('dataStore', () => {
       expect(useDataStore.getState().getNodeOutput('n1')).toEqual(df);
     });
 
+    it('bumps outputVersions on every setNodeOutput', () => {
+      const df = makeDataFrame(['x'], [{ x: 1 }]);
+      useDataStore.getState().setNodeOutput('n1', df);
+      expect(useDataStore.getState().outputVersions['n1']).toBe(1);
+      useDataStore.getState().setNodeOutput('n1', df);
+      expect(useDataStore.getState().outputVersions['n1']).toBe(2);
+    });
+
     it('returns undefined for missing node id', () => {
       expect(useDataStore.getState().getNodeOutput('missing')).toBeUndefined();
     });
@@ -78,6 +86,7 @@ describe('dataStore', () => {
       useDataStore.getState().clearNodeOutputs();
       expect(useDataStore.getState().getNodeOutput('n1')).toBeUndefined();
       expect(useDataStore.getState().getNodeOutput('n2')).toBeUndefined();
+      expect(useDataStore.getState().outputVersions).toEqual({});
     });
   });
 });

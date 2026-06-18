@@ -11,6 +11,21 @@ import { useChartImage } from '@/hooks/useChartImage';
 import type { ChartNodeData } from '@/types';
 
 const CHART_TYPES = ['bar', 'line', 'area', 'scatter', 'pie'] as const;
+const CHART_RENDER_DPI = 100;
+const CHART_PREVIEW_MAX_HEIGHT = 280;
+
+function chartRenderPixels(figWidth?: number, figHeight?: number) {
+  const wIn = figWidth ?? 10;
+  const hIn = figHeight ?? 6;
+  let width = Math.round(wIn * CHART_RENDER_DPI);
+  let height = Math.round(hIn * CHART_RENDER_DPI);
+  if (height > CHART_PREVIEW_MAX_HEIGHT) {
+    const scale = CHART_PREVIEW_MAX_HEIGHT / height;
+    width = Math.round(width * scale);
+    height = CHART_PREVIEW_MAX_HEIGHT;
+  }
+  return { width, height };
+}
 
 type ChartNodeProps = NodeProps & {
   data: ChartNodeData;
@@ -117,14 +132,15 @@ function ChartPreviewArea({
   hasChart,
   onOpenPreview,
 }: ChartPreviewAreaProps) {
+  const { width, height } = chartRenderPixels(data.figWidth, data.figHeight);
   const { image, isLoading, error } = useChartImage({
     chartType: data.chartType || 'bar',
     xAxis: data.xAxis || '',
     yAxis: data.yAxis || '',
     colorBy: data.colorBy,
     data: previewData,
-    width: 640,
-    height: 280,
+    width,
+    height,
   });
 
   return (
@@ -262,6 +278,8 @@ export function ChartNode({ id, data, selected }: ChartNodeProps) {
         xAxis={data.xAxis || ''}
         yAxis={data.yAxis || ''}
         colorBy={data.colorBy}
+        figWidth={data.figWidth}
+        figHeight={data.figHeight}
         data={chartData}
         columns={columns}
       />

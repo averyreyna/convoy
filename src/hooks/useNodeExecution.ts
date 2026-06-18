@@ -4,69 +4,15 @@ import { useDataStore } from '@/stores/dataStore';
 import { useUpstreamData } from './useUpstreamData';
 import { executeNode } from '@/lib/nodeExecutors';
 import { isNativelySupported } from '@/lib/nativeExecutors';
+import { isConfigComplete } from '@/lib/isConfigComplete';
+import { buildNodeExecKey, buildPassThroughKey } from '@/lib/nodeExecutionKey';
 import type { DataFrame } from '@/types';
 
 /**
  * Returns true when config (and optional customCode) is complete enough to run the node.
  * Incomplete configs cause pass-through instead of running Python.
  */
-function isConfigComplete(
-  nodeType: string,
-  config: Record<string, unknown>,
-  customCode?: string
-): boolean {
-  switch (nodeType) {
-    case 'filter': {
-      const { column, operator, value } = config;
-      if (!column || !operator) return false;
-      const valueStr =
-        value !== undefined && value !== null ? String(value).trim() : '';
-      const needValue = ['eq', 'neq', 'gt', 'lt', 'contains', 'startsWith'].includes(
-        operator as string
-      );
-      return !needValue || valueStr !== '';
-    }
-    case 'groupBy': {
-      const { groupByColumn, aggregation } = config;
-      return !!(groupByColumn && aggregation);
-    }
-    case 'sort':
-      return !!config.column;
-    case 'select': {
-      const cols = config.columns as string[] | undefined;
-      return Array.isArray(cols) && cols.length > 0;
-    }
-    case 'transform':
-      return !!(
-        customCode &&
-        typeof customCode === 'string' &&
-        customCode.trim() !== ''
-      );
-    case 'computedColumn': {
-      const { newColumnName, expression } = config;
-      return !!(
-        newColumnName &&
-        expression &&
-        String(expression).trim() !== ''
-      );
-    }
-    case 'reshape': {
-      const { keyColumn, valueColumn, pivotColumns } = config as {
-        keyColumn?: string;
-        valueColumn?: string;
-        pivotColumns?: string[];
-      };
-      return !!(
-        keyColumn &&
-        valueColumn &&
-        Array.isArray(pivotColumns) &&
-        pivotColumns.length > 0
-      );
-    }
-    default:
-      return true;
-  }
-}
+export { isConfigComplete } from '@/lib/isConfigComplete';
 
 const DEBOUNCE_MS = 400;
 // Native nodes execute synchronously and skip the Pyodide queue, so they only
@@ -84,6 +30,12 @@ export function useNodeExecution(
   customCode?: string
 ) {
   const upstreamData = useUpstreamData(nodeId);
+  const upstreamSourceId = useCanvasStore((s) =>
+    s.edges.find((e) => e.target === nodeId)?.source
+  );
+  const upstreamVersion = useDataStore((s) =>
+    upstreamSourceId != null ? (s.outputVersions[upstreamSourceId] ?? 0) : 0
+  );
   const setNodeOutput = useDataStore((s) => s.setNodeOutput);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const markChildrenStale = useCanvasStore((s) => s.markChildrenStale);
@@ -97,6 +49,7 @@ export function useNodeExecution(
 
   const lastExecKey = useRef<string>('');
   const lastPassThroughKey = useRef<string>('');
+  const pendingExecKeyRef = useRef<string>('');
   const runIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [runRequest, setRunRequest] = useState(0);
@@ -132,9 +85,7 @@ export function useNodeExecution(
       // change. Writing unconditionally here re-renders the node, and if any
       // input dependency is an unstable reference the effect would re-run and
       // loop ("Maximum update depth exceeded").
-      const passKey = `${upstreamData.rows.length}:${upstreamData.columns
-        .map((c) => c.name)
-        .join(',')}`;
+      const passKey = buildPassThroughKey(upstreamVersion, upstreamData);
       if (passKey !== lastPassThroughKey.current) {
         lastPassThroughKey.current = passKey;
         setNodeOutput(nodeId, upstreamData);
@@ -156,21 +107,27 @@ export function useNodeExecution(
     // pass-through key so a later return to an incomplete config re-writes.
     lastPassThroughKey.current = '';
 
-    const execKey = JSON.stringify({
+    const execKey = buildNodeExecKey({
       config,
       customCode,
-      inputLen: upstreamData.rows.length,
-      inputCols: upstreamData.columns.map((c) => c.name).join(','),
+      upstreamVersion,
+      upstreamData,
       runRequest,
     });
 
     if (execKey === lastExecKey.current) {
       // Inputs are unchanged, so this node won't recompute and its current
       // output is still valid — clear any stale mark a parent left on it.
-      clearNodeStale(nodeId);
+      // If we're still marked stale, a parent invalidation is in flight; keep
+      // the badge until upstreamVersion bumps and we actually rerun.
+      const stillStale = !!useCanvasStore.getState().staleNodeIds[nodeId];
+      if (!stillStale) {
+        clearNodeStale(nodeId);
+      }
       return;
     }
-    lastExecKey.current = execKey;
+
+    pendingExecKeyRef.current = execKey;
 
     const baseDebounce = isNativelySupported(nodeType) ? NATIVE_DEBOUNCE_MS : DEBOUNCE_MS;
     const debounceMs = executionDebounceBypassUntil > Date.now() ? 0 : baseDebounce;
@@ -183,6 +140,12 @@ export function useNodeExecution(
       const code = customCodeRef.current;
       const up = upstreamDataRef.current;
       if (!up || !isConfirmedRef.current || useCanvasStore.getState().pipelineRunInProgress) return;
+
+      // Commit the exec key only when a run actually starts. Setting it when
+      // scheduling caused cancelled debounce timers to leave nodes stuck stale:
+      // a re-render from markChildrenStale would clear the timer, see an
+      // already-committed key, and skip rescheduling.
+      lastExecKey.current = pendingExecKeyRef.current;
 
       runIdRef.current += 1;
       const thisRunId = runIdRef.current;
@@ -249,6 +212,7 @@ export function useNodeExecution(
     customCode,
     isConfirmed,
     upstreamData,
+    upstreamVersion,
     runRequest,
     pipelineRunInProgress,
     executionDebounceBypassUntil,

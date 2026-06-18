@@ -67,16 +67,27 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
   return prev.then(() => job()).finally(() => resolveNext());
 }
 
+export interface RunPythonOptions {
+  /** When true, run Python even if input has 0 rows (schema-only empty frame). */
+  allowEmptyExecution?: boolean;
+}
+
 /**
  * Run Python code with input dataframe in scope as `df`.
  * Returns the resulting dataframe (must be named `df` in the Python scope).
- * If input has no rows, returns empty result with same columns without running Python (avoids KeyError when df has no columns).
+ * By default, if input has no rows, returns empty result with same columns without
+ * running Python. Pass `allowEmptyExecution: true` for live eval on schema-only frames.
  */
 export async function runPythonWithDataFrame(
   input: DataFrame,
-  code: string
+  code: string,
+  options?: RunPythonOptions
 ): Promise<DataFrame> {
-  if (!input.rows.length) {
+  if (!input.rows.length && !options?.allowEmptyExecution) {
+    return { columns: input.columns, rows: [] };
+  }
+
+  if (!input.rows.length && input.columns.length === 0) {
     return { columns: input.columns, rows: [] };
   }
 

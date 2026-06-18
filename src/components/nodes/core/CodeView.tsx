@@ -1,10 +1,12 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { Code2, Settings2, RotateCcw, CheckCircle2, AlertCircle, Circle, ClipboardPaste, Pencil, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { segmentControl, segmentControlItem, segmentControlItemSelected } from '@/flank';
 import { generateNodeCode, getEditorLanguage } from '@/lib/codeGenerators';
 import { validateSyntax } from '@/lib/codeValidation';
+import { knownSchema, unknownSchema } from '@/lib/inferSchema';
+import { useMonacoSchemaFeedback } from '@/hooks/useMonacoSchemaFeedback';
 import type { editor as monacoEditor } from 'monaco-editor';
 
 interface CodeViewProps {
@@ -63,8 +65,15 @@ export function CodeView({
   const [draft, setDraft] = useState('');
 
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
+  const [monaco, setMonaco] = useState<typeof import('monaco-editor') | null>(null);
   const validationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const inputSchema = useMemo(() => {
+    if (!upstreamColumns?.length) return unknownSchema;
+    return knownSchema(
+      upstreamColumns.map((name) => ({ name, type: 'string' as const }))
+    );
+  }, [upstreamColumns]);
 
   // Regenerate code when config changes (only if user hasn't manually edited)
   useEffect(() => {
@@ -75,6 +84,14 @@ export function CodeView({
 
   const displayCode = customCode || generatedCode;
   const editorValue = isEditMode ? draft : displayCode;
+
+  useMonacoSchemaFeedback(editorRef.current, monaco, {
+    code: editorValue,
+    diagnostics: [],
+    inputSchema,
+    nodeType,
+    enabled: isExecutableCode,
+  });
 
   // Determine status indicator
   let status: EditorStatus = 'idle';
@@ -98,14 +115,14 @@ export function CodeView({
 
       // Set Monaco markers for squiggly underlines
       const editor = editorRef.current;
-      const monaco = monacoRef.current;
-      if (editor && monaco) {
+      const monacoInstance = monaco;
+      if (editor && monacoInstance) {
         const model = editor.getModel();
         if (model) {
           if (!result.valid && result.error) {
             const line = result.line ?? 1;
             const col = result.column ?? 1;
-            monaco.editor.setModelMarkers(model, 'codeValidation', [
+            monacoInstance.editor.setModelMarkers(model, 'codeValidation', [
               {
                 severity: monaco.MarkerSeverity.Error,
                 message: result.error,
@@ -116,12 +133,12 @@ export function CodeView({
               },
             ]);
           } else {
-            monaco.editor.setModelMarkers(model, 'codeValidation', []);
+            monacoInstance.editor.setModelMarkers(model, 'codeValidation', []);
           }
         }
       }
     },
-    [isExecutableCode]
+    [isExecutableCode, monaco]
   );
 
   const handleEditorChange = useCallback(
@@ -173,12 +190,11 @@ export function CodeView({
     setDraft('');
     // Clear validation markers when reverting to saved code
     const editor = editorRef.current;
-    const monaco = monacoRef.current;
     if (editor && monaco) {
       const model = editor.getModel();
       if (model) monaco.editor.setModelMarkers(model, 'codeValidation', []);
     }
-  }, []);
+  }, [monaco]);
 
   // ─── Paste code from clipboard (Phase 3: paste snippet and iterate) ─────────────
   const handlePasteCode = useCallback(async () => {
@@ -204,7 +220,6 @@ export function CodeView({
 
     // Clear Monaco markers
     const editor = editorRef.current;
-    const monaco = monacoRef.current;
     if (editor && monaco) {
       const model = editor.getModel();
       if (model) {
@@ -216,7 +231,7 @@ export function CodeView({
     if (!codeOnly) {
       onToggleMode();
     }
-  }, [nodeType, config, onCodeChange, onToggleMode, codeOnly]);
+  }, [nodeType, config, onCodeChange, onToggleMode, codeOnly, monaco]);
 
   // ─── Auto-resize editor height ──────────────────────────────────────────────
   const updateEditorHeight = useCallback(() => {
@@ -229,9 +244,9 @@ export function CodeView({
 
   // ─── Monaco onMount: register autocomplete, compute height ──────────────────
   const handleEditorMount: OnMount = useCallback(
-    (editor, monaco) => {
+    (editor, monacoInstance) => {
       editorRef.current = editor;
-      monacoRef.current = monaco;
+      setMonaco(monacoInstance);
 
       // Compute initial height
       const contentHeight = editor.getContentHeight();
@@ -242,36 +257,12 @@ export function CodeView({
         updateEditorHeight();
       });
 
-      // Register column-name autocomplete for Python nodes
-      if (isExecutableCode && upstreamColumns && upstreamColumns.length > 0) {
-        monaco.languages.registerCompletionItemProvider('python', {
-          triggerCharacters: ['.', '[', '"', "'"],
-          provideCompletionItems: (model: monacoEditor.ITextModel, position: import('monaco-editor').Position) => {
-            const word = model.getWordUntilPosition(position);
-            const range = {
-              startLineNumber: position.lineNumber,
-              endLineNumber: position.lineNumber,
-              startColumn: word.startColumn,
-              endColumn: word.endColumn,
-            };
-            const suggestions = (upstreamColumns ?? []).map((col) => ({
-              label: col,
-              kind: monaco.languages.CompletionItemKind.Field,
-              insertText: col,
-              range,
-              detail: 'column name',
-            }));
-            return { suggestions };
-          },
-        });
-      }
-
       // Run initial validation
       if (hasEdited && isExecutableCode) {
         validateCode(editor.getValue());
       }
     },
-    [isExecutableCode, upstreamColumns, hasEdited, validateCode, updateEditorHeight]
+    [isExecutableCode, hasEdited, validateCode, updateEditorHeight]
   );
 
   // ─── Common editor options ──────────────────────────────────────────────────

@@ -11,6 +11,8 @@ export interface NodeDataPayload {
 interface DataStore {
   nodeData: Record<string, NodeDataPayload>;
   nodeOutputs: Record<string, DataFrame>;
+  /** Bumped on every setNodeOutput so downstream nodes detect value changes. */
+  outputVersions: Record<string, number>;
 
   setNodeData: (nodeId: string, data: NodeDataPayload) => void;
   getNodeData: (nodeId: string) => NodeDataPayload | undefined;
@@ -25,6 +27,7 @@ interface DataStore {
 export const useDataStore = create<DataStore>((set, get) => ({
   nodeData: {},
   nodeOutputs: {},
+  outputVersions: {},
 
   setNodeData: (nodeId, data) =>
     set((state) => ({
@@ -42,15 +45,20 @@ export const useDataStore = create<DataStore>((set, get) => ({
   setNodeOutput: (nodeId, data) =>
     set((state) => ({
       nodeOutputs: { ...state.nodeOutputs, [nodeId]: data },
+      outputVersions: {
+        ...state.outputVersions,
+        [nodeId]: (state.outputVersions[nodeId] ?? 0) + 1,
+      },
     })),
 
   getNodeOutput: (nodeId) => get().nodeOutputs[nodeId],
 
   removeNodeOutput: (nodeId) =>
     set((state) => {
-      const { [nodeId]: _, ...rest } = state.nodeOutputs;
-      return { nodeOutputs: rest };
+      const { [nodeId]: _out, ...restOutputs } = state.nodeOutputs;
+      const { [nodeId]: _ver, ...restVersions } = state.outputVersions;
+      return { nodeOutputs: restOutputs, outputVersions: restVersions };
     }),
 
-  clearNodeOutputs: () => set({ nodeOutputs: {} }),
+  clearNodeOutputs: () => set({ nodeOutputs: {}, outputVersions: {} }),
 }));

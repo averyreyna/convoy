@@ -16,6 +16,12 @@ export function useAiCleanDataExecution(
   isConfirmed: boolean
 ) {
   const upstreamData = useUpstreamData(nodeId);
+  const upstreamSourceId = useCanvasStore((s) =>
+    s.edges.find((e) => e.target === nodeId)?.source
+  );
+  const upstreamVersion = useDataStore((s) =>
+    upstreamSourceId != null ? (s.outputVersions[upstreamSourceId] ?? 0) : 0
+  );
   const setNodeOutput = useDataStore((s) => s.setNodeOutput);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const pipelineRunInProgress = useCanvasStore((s) => s.pipelineRunInProgress);
@@ -27,15 +33,17 @@ export function useAiCleanDataExecution(
 
     const execKey = JSON.stringify({
       generatedCode,
+      upstreamVersion,
       inputLen: upstreamData.rows.length,
       inputCols: upstreamData.columns.map((c) => c.name).join(','),
     });
     if (execKey === lastExecKey.current) return;
-    lastExecKey.current = execKey;
 
     let cancelled = false;
 
     (async () => {
+      if (cancelled) return;
+      lastExecKey.current = execKey;
       try {
         const result: DataFrame = await runPythonWithDataFrame(upstreamData, generatedCode);
         if (cancelled) return;
@@ -64,6 +72,7 @@ export function useAiCleanDataExecution(
     generatedCode,
     isConfirmed,
     upstreamData,
+    upstreamVersion,
     pipelineRunInProgress,
     setNodeOutput,
     updateNode,

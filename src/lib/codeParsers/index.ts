@@ -23,6 +23,7 @@ export const PARSEABLE_NODE_TYPES = new Set([
   'groupBy',
   'computedColumn',
   'reshape',
+  'chart',
 ]);
 
 export function isParseable(nodeType: string): boolean {
@@ -55,6 +56,8 @@ export function parseNodeCode(
       return parseComputedColumn(line);
     case 'reshape':
       return parseReshape(line);
+    case 'chart':
+      return parseChart(code);
     default:
       return null;
   }
@@ -200,4 +203,55 @@ function parseReshape(line: string): Record<string, unknown> | null {
     valueColumn: m[4],
     pivotColumns,
   };
+}
+
+/** Inverse of generateChartCode — matches the multi-line matplotlib block shape. */
+function parseChart(code: string): Record<string, unknown> | null {
+  const trimmed = code.trim();
+  if (trimmed === '' || trimmed.startsWith('#')) return null;
+
+  const figsize = trimmed.match(/plt\.figure\(figsize=\(([\d.]+),\s*([\d.]+)\)\)/);
+  if (!figsize) return null;
+  const figWidth = Number(figsize[1]);
+  const figHeight = Number(figsize[2]);
+  if (!Number.isFinite(figWidth) || !Number.isFinite(figHeight)) return null;
+
+  const pie = trimmed.match(/plt\.pie\(df\["(.*?)"\],\s*labels=df\["(.*?)"\]/);
+  if (pie) {
+    return {
+      chartType: 'pie',
+      yAxis: pyUnescape(pie[1]),
+      xAxis: pyUnescape(pie[2]),
+      figWidth,
+      figHeight,
+    };
+  }
+
+  const xyPlot = trimmed.match(/plt\.(bar|plot|scatter)\(df\["(.*?)"\],\s*df\["(.*?)"\]\)/);
+  if (xyPlot) {
+    const chartType =
+      xyPlot[1] === 'plot' ? 'line' : xyPlot[1] === 'scatter' ? 'scatter' : 'bar';
+    return {
+      chartType,
+      xAxis: pyUnescape(xyPlot[2]),
+      yAxis: pyUnescape(xyPlot[3]),
+      figWidth,
+      figHeight,
+    };
+  }
+
+  const area = trimmed.match(/pd\.to_numeric\(df\["(.*?)"\],\s*errors="coerce"\)/);
+  if (area && trimmed.includes('plt.fill_between')) {
+    const xAxis = trimmed.match(/plt\.xlabel\("(.*?)"\)/);
+    if (!xAxis) return null;
+    return {
+      chartType: 'area',
+      xAxis: pyUnescape(xAxis[1]),
+      yAxis: pyUnescape(area[1]),
+      figWidth,
+      figHeight,
+    };
+  }
+
+  return null;
 }
