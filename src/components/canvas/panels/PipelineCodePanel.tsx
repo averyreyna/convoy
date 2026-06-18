@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 import { diffLines, type Change } from 'diff';
+import type { Column } from '@/types';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useDataStore } from '@/stores/dataStore';
 import { generateNodeCode } from '@/lib/codeGenerators';
@@ -15,6 +16,13 @@ import {
   downloadNotebook,
   copyAsJupyterCells,
 } from '@/lib/exportPipeline';
+import {
+  inferSchemaFromCode,
+  knownSchema,
+  unknownSchema,
+  type Schema,
+  type SchemaDiagnostic,
+} from '@/lib/inferSchema';
 import { runFullPipelineScript } from '@/lib/pythonRunner';
 import { importPipelineFromPython, editNodes } from '@/lib/api';
 import { buildEditNodesPipelineContext } from '@/lib/pipelineContext';
@@ -145,6 +153,48 @@ export function PipelineCodePanel() {
     }));
     return [...nodeCells, ...draftAsCells];
   }, [nodeCells, draftCells]);
+
+  // Layer-2 wiring of the static schema semantics: thread inferSchema down the
+  // real graph lineage (parent edges, so branches stay correct) and collect each
+  // cell's diagnostics. Uses the cell's *code* so feedback updates live as the
+  // user types; the data source establishes the root schema from its loaded
+  // columns (its code is opaque pd.read_csv, so we can't recover columns from it).
+  const diagnosticsByCellId = useMemo(() => {
+    const parentOf = new Map<string, string>();
+    for (const e of edges) parentOf.set(e.target, e.source);
+
+    const schemaOut = new Map<string, Schema>();
+    const diagnostics = new Map<string, SchemaDiagnostic[]>();
+
+    // nodeCells is topologically sorted, so a node's parent is always resolved first.
+    for (const cell of nodeCells) {
+      if (cell.nodeType === 'dataSource') {
+        const cols =
+          nodeData[cell.nodeId]?.columns ??
+          (nodes.find((n) => n.id === cell.nodeId)?.data as { columns?: Column[] } | undefined)?.columns;
+        schemaOut.set(cell.nodeId, cols?.length ? knownSchema(cols) : unknownSchema);
+        diagnostics.set(cell.nodeId, []);
+        continue;
+      }
+      const parentId = parentOf.get(cell.nodeId);
+      const input = (parentId && schemaOut.get(parentId)) || unknownSchema;
+      const { outputSchema, diagnostics: diags } = inferSchemaFromCode(input, cell.code, cell.nodeType);
+      schemaOut.set(cell.nodeId, outputSchema);
+      diagnostics.set(cell.nodeId, diags);
+    }
+
+    // Draft cells (not yet graph nodes) chain off the last node cell's output.
+    let prev = nodeCells.length
+      ? schemaOut.get(nodeCells[nodeCells.length - 1].nodeId) ?? unknownSchema
+      : unknownSchema;
+    for (const draft of draftCells) {
+      const { outputSchema, diagnostics: diags } = inferSchemaFromCode(prev, draft.code);
+      diagnostics.set(draft.id, diags);
+      prev = outputSchema;
+    }
+
+    return diagnostics;
+  }, [nodeCells, draftCells, edges, nodes, nodeData]);
 
   const aiCells: AiConversationCellViewModel[] = useMemo(() => {
     if (!aiNotebookCells.length) return [];
@@ -704,6 +754,7 @@ export function PipelineCodePanel() {
           <PipelineCellList
             cells={cells}
             nodes={nodes}
+            diagnosticsByCellId={diagnosticsByCellId}
             baselineByNodeId={baselineByNodeId}
             selectedNodeIds={selectedNodeIds}
             focusedCellNodeId={focusedCellNodeId}

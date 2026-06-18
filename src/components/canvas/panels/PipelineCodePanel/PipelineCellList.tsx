@@ -4,6 +4,7 @@ import { diffLines } from 'diff';
 import Editor from '@monaco-editor/react';
 import { ChevronDown, ChevronRight, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { SchemaDiagnostic } from '@/lib/inferSchema';
 import { useCanvasStore } from '@/stores/canvasStore';
 import {
   button,
@@ -73,6 +74,7 @@ interface BaselineSnapshot {
 interface PipelineCellListProps {
   cells: PipelineCellViewModel[];
   nodes: Node[];
+  diagnosticsByCellId: Map<string, SchemaDiagnostic[]>;
   baselineByNodeId: Record<string, BaselineSnapshot>;
   selectedNodeIds: Set<string>;
   focusedCellNodeId: string | null;
@@ -91,6 +93,7 @@ interface PipelineCellListProps {
 export function PipelineCellList({
   cells,
   nodes,
+  diagnosticsByCellId,
   baselineByNodeId,
   selectedNodeIds,
   focusedCellNodeId,
@@ -154,6 +157,7 @@ export function PipelineCellList({
         const isFocused = focusedCellNodeId === cell.nodeId;
         const isHovered = isNodeBacked && hoveredNodeId === cell.nodeId;
         const isStale = isNodeBacked && !!staleNodeIds[cell.nodeId];
+        const diagnostics = diagnosticsByCellId.get(cell.nodeId) ?? [];
         const node = isNodeBacked ? nodes.find((n) => n.id === cell.nodeId) : null;
         const baseline = isNodeBacked && node ? baselineByNodeId[cell.nodeId] : undefined;
 
@@ -259,6 +263,23 @@ export function PipelineCellList({
                   }}
                 />
               </div>
+              {diagnostics.length > 0 && (
+                <div className="space-y-0.5 border-t border-gray-100 px-2 py-1">
+                  {diagnostics.map((d, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'flex items-start gap-1 text-[10px] leading-snug',
+                        d.severity === 'error' ? 'text-red-600' : 'text-amber-600'
+                      )}
+                      title={d.severity === 'error' ? 'Schema error' : 'Schema warning'}
+                    >
+                      <span aria-hidden>{d.severity === 'error' ? '⨯' : '⚠'}</span>
+                      <span className="min-w-0 flex-1 break-words">{d.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {hasCellDiff && (
                 <div className="border-t border-gray-100 bg-gray-50/80">
                   <button

@@ -19,3 +19,6 @@ dist/
 # Logs
 *.log
 npm-debug.log*
+
+# Local design/scratch notes
+notes/
