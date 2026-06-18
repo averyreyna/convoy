@@ -9,56 +9,13 @@ import type {
   EditNodesPipelineContext,
   EditNodesResponse,
   SuggestedPipelineNode,
-  AnswerAboutNodesResponse,
 } from '@/types';
 
-export type { EditNodesSchema, EditNodesPipelineContext, EditNodesResponse, SuggestedPipelineNode, AnswerAboutNodesResponse };
+export type { EditNodesSchema, EditNodesPipelineContext, EditNodesResponse, SuggestedPipelineNode };
 
 /**
- * Base URL for API requests. Use relative URLs (empty string) so the app works
- * with the Vite proxy in dev and same-origin in production. Override with
- * VITE_API_URL only when you need to point at a different API host.
- */
-const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
-
-function buildApiUrl(path: string): string {
-  if (!API_BASE) return path;
-  return `${API_BASE.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
-}
-
-/**
- * Generate a plain-language explanation for a node.
- * Sends node type, config, and row counts to the backend, which calls Claude
- * to produce a human-readable explanation of what the node does.
- */
-export async function generateExplanation(params: {
-  nodeType: string;
-  nodeConfig: Record<string, unknown>;
-  inputRowCount?: number;
-  outputRowCount?: number;
-}): Promise<string> {
-  const response = await fetch('/api/explain-node', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nodeType: params.nodeType,
-      config: params.nodeConfig,
-      inputRowCount: params.inputRowCount,
-      outputRowCount: params.outputRowCount,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `API request failed with status ${response.status}`);
-  }
-
-  const data: { explanation: string } = await response.json();
-  return data.explanation;
-}
-
-/**
- * Import a pipeline from Python (pandas) source.
+ * Import a pipeline from Python (pandas) source. Powers run-reconciliation:
+ * after a script executes, the resulting code is parsed back into typed nodes.
  * Server uses AST extraction first, then LLM fallback for complex scripts.
  */
 export async function importPipelineFromPython(
@@ -86,6 +43,18 @@ export async function importPipelineFromPython(
   }
 
   return data;
+}
+
+/**
+ * Base URL for API requests. Use relative URLs (empty string) so the app works
+ * with the Vite proxy in dev and same-origin in production. Override with
+ * VITE_API_URL only when you need to point at a different API host.
+ */
+const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
+
+function buildApiUrl(path: string): string {
+  if (!API_BASE) return path;
+  return `${API_BASE.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
 }
 
 /**
@@ -140,95 +109,6 @@ export async function editNodes(params: {
     console.log('[editNodes] Response', nodeCount === 0 ? 'empty suggestedPipeline' : { suggestedNodeCount: nodeCount });
   }
   return data;
-}
-
-/**
- * Get advice about connected nodes. Sends node IDs, question, optional schema and pipeline context.
- * Returns a text answer (advice, next steps, feedback). No pipeline edits.
- */
-export async function answerAboutNodes(params: {
-  nodeIds: string[];
-  question: string;
-  schema?: EditNodesSchema;
-  pipelineContext?: EditNodesPipelineContext;
-}): Promise<AnswerAboutNodesResponse> {
-  const { nodeIds, question, schema, pipelineContext } = params;
-
-  const url = buildApiUrl('/api/answer-about-nodes');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nodeIds,
-      question,
-      ...(schema && { schema }),
-      ...(pipelineContext && { pipelineContext }),
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    let message: string;
-    try {
-      const body = JSON.parse(text) as { error?: string };
-      message = body.error || `Answer about nodes failed (${response.status})`;
-    } catch {
-      message = text
-        ? `Answer about nodes failed (${response.status}). ${text.slice(0, 200)}`
-        : `Answer about nodes failed (${response.status}). No details from server.`;
-    }
-    throw new Error(message);
-  }
-
-  const data: AnswerAboutNodesResponse = await response.json();
-  return data;
-}
-
-/**
- * Diagnose connected node(s). Sends node IDs, optional question, output schema/sample rows,
- * and pipeline context. Returns a plain-language diagnosis (creates a canvas note in the UI).
- */
-export async function diagnoseNodesWithAi(params: {
-  nodeIds: string[];
-  question?: string;
-  schema?: EditNodesSchema;
-  sampleRows?: Record<string, unknown>[];
-  pipelineContext?: EditNodesPipelineContext;
-}): Promise<{ diagnosis: string }> {
-  const { nodeIds, question, schema, sampleRows, pipelineContext } = params;
-
-  const url = buildApiUrl('/api/diagnose-nodes');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nodeIds,
-      ...(question !== undefined && question !== '' && { question }),
-      ...(schema && { schema }),
-      ...(sampleRows && { sampleRows }),
-      ...(pipelineContext && { pipelineContext }),
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    let message: string;
-    try {
-      const body = JSON.parse(text) as { error?: string };
-      message = body.error || `Diagnose nodes failed (${response.status})`;
-    } catch {
-      message = text
-        ? `Diagnose nodes failed (${response.status}). ${text.slice(0, 200)}`
-        : `Diagnose nodes failed (${response.status}). No details from server.`;
-    }
-    throw new Error(message);
-  }
-
-  const data = (await response.json()) as { diagnosis?: string };
-  if (typeof data.diagnosis !== 'string') {
-    throw new Error('Invalid diagnose-nodes response: missing diagnosis');
-  }
-  return { diagnosis: data.diagnosis };
 }
 
 /**
@@ -309,45 +189,4 @@ export async function cleanDataWithAi(params: {
     throw new Error('Invalid clean-data response: missing code');
   }
   return { code: data.code };
-}
-
-/**
- * Summarize a dataset in plain language. Sends schema and optional sample rows
- * and prompt; returns a short summary string for display in a canvas note.
- */
-export async function summarizeDataWithAi(params: {
-  schema: EditNodesSchema;
-  sampleRows?: Record<string, unknown>[];
-  prompt?: string;
-}): Promise<{ summary: string; title?: string }> {
-  const { schema, sampleRows, prompt } = params;
-  const url = buildApiUrl('/api/summarize-data');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ schema, sampleRows, prompt }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    let message: string;
-    try {
-      const body = JSON.parse(text) as { error?: string };
-      message = body.error || `Summarize data failed (${response.status})`;
-    } catch {
-      message = text
-        ? `Summarize data failed (${response.status}). ${text.slice(0, 200)}`
-        : `Summarize data failed (${response.status}). No details from server.`;
-    }
-    throw new Error(message);
-  }
-
-  const data = (await response.json()) as { summary?: string; title?: string };
-  if (typeof data.summary !== 'string') {
-    throw new Error('Invalid summarize-data response: missing summary');
-  }
-  return {
-    summary: data.summary,
-    title: typeof data.title === 'string' ? data.title.trim() || undefined : undefined,
-  };
 }

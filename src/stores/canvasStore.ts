@@ -30,7 +30,7 @@ export type BaselineLanguage = 'python';
 export interface AiNotebookCell {
   id: string;
   createdAt: number;
-  source: 'editNodes' | 'aiAdvisor';
+  source: 'editNodes';
   nodeIds: string[];
   question: string;
   answer: string;
@@ -47,9 +47,6 @@ interface CanvasStore {
     zoom: number;
   };
   setViewport: (viewport: { x: number; y: number; zoom: number }) => void;
-
-  showImportModal: boolean;
-  setShowImportModal: (show: boolean) => void;
 
   // Baseline (for diff viewer): set on import or "Pin current"
   baselineCode: string | null;
@@ -86,7 +83,6 @@ interface CanvasStore {
   removeEdge: (id: string) => void;
 
   // Pipeline operations
-  addProposedPipeline: (pipeline: ProposedPipeline) => void;
   setPipelineFromImport: (pipeline: ProposedPipeline) => void;
   applyImportToExistingPipeline: (pipeline: ProposedPipeline, options?: ApplyImportOptions) => void;
   replaceNodesWithSuggestedPipeline: (nodeIdsToReplace: string[], suggested: { nodes: SuggestedPipelineNode[] }, options?: { insertAfterNodeId?: string }) => void;
@@ -195,9 +191,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     zoom: 0.85,
   },
   setViewport: (viewport) => set({ viewport }),
-
-  showImportModal: false,
-  setShowImportModal: (show) => set({ showImportModal: show }),
 
   baselineCode: null,
   baselineLanguage: null,
@@ -320,62 +313,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((state) => ({
       edges: state.edges.filter((edge) => edge.id !== id),
     })),
-
-  addProposedPipeline: (pipeline) => {
-    const { nodes: existingNodes, edges: existingEdges } = get();
-    const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
-
-    // Find DataSource node to connect to
-    const dataSourceNode = existingNodes.find((n) => n.type === 'dataSource');
-    if (!dataSourceNode) return;
-
-    const newNodes: Node[] = [];
-    const newEdges: Edge[] = [];
-
-    let previousNodeId = dataSourceNode.id;
-    let xOffset = dataSourceNode.position.x + 320;
-
-    pipeline.nodes.forEach((nodeConfig, index) => {
-      const nodeId = `proposed-${Date.now()}-${index}`;
-      const type = nodeConfig.type;
-      const supportsCodeMode =
-        type !== 'dataSource' && type !== 'transform';
-
-      newNodes.push({
-        id: nodeId,
-        type,
-        position: { x: xOffset, y: dataSourceNode.position.y },
-        data: {
-          state: 'proposed' as const,
-          label: type.charAt(0).toUpperCase() + type.slice(1),
-          ...nodeConfig.config,
-          ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
-        },
-      });
-
-      newEdges.push({
-        id: `edge-${previousNodeId}-${nodeId}`,
-        source: previousNodeId,
-        target: nodeId,
-        sourceHandle: 'source',
-        targetHandle: 'target',
-        type: 'dataFlow',
-        animated: true,
-        style: { opacity: 0.5 },
-      });
-
-      previousNodeId = nodeId;
-      xOffset += 320;
-    });
-
-    const nodes = [...existingNodes, ...newNodes];
-    const edges = recomputeEdgeStatuses(nodes, [...existingEdges, ...newEdges]);
-
-    set({
-      nodes,
-      edges,
-    });
-  },
 
   setPipelineFromImport: (pipeline) => {
     const { nodes: existingNodes, edges: existingEdges } = get();

@@ -1,11 +1,10 @@
 import { useCallback, useRef } from 'react';
-import { Sparkles, FileInput, Layers } from 'lucide-react';
+import { Sparkles, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PaletteCategory } from './NodePalette';
 
 const PALETTE_TABS: { id: PaletteCategory; label: string; icon: React.ReactNode }[] = [
   { id: 'ai', label: 'AI', icon: <Sparkles size={18} /> },
-  { id: 'data', label: 'Data', icon: <FileInput size={18} /> },
   { id: 'nodes', label: 'Nodes', icon: <Layers size={18} /> },
 ];
 

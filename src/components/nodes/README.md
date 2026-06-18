@@ -9,14 +9,13 @@ Node components in this folder render Convoy’s React Flow nodes and wire them 
   - `DataPreview` – collapsible table preview for node outputs.
   - `CodeView` – shared code editor/toggle for nodes with code.
   - `NodeCodePreview` – small, read-only code preview block.
-  - `ExplanationPopover` – AI explanation popover for supported nodes.
   - `ChartPreviewModal` – full-screen chart preview/export.
 - `data/` – data-manipulation and charting nodes:
   - `DataSourceNode`, `FilterNode`, `GroupByNode`, `SortNode`, `SelectNode`,
     `TransformNode`, `ComputedColumnNode`, `ReshapeNode`, `ChartNode`.
 - `ai/` – AI-specific nodes and helpers:
-  - `AiQueryNode`, `AiAdvisorNode`, `AiCallButton`, `AiErrorAlert`, `AiSuggestionList`.
-  - These compose `core` primitives and the helpers in `src/lib/aiNodes.ts`.
+  - `AiCleanDataNode`, `AiCallButton`, `AiErrorAlert`.
+  - These compose `core` primitives and the API client in `src/lib/api.ts`.
 
 `src/components/nodes/index.ts` exposes `NODE_DEFS`, `nodeTypes`, and `nodeTypeInfos`
 so most callers can import from `@/components/nodes` without knowing the folder layout.
@@ -27,17 +26,16 @@ so most callers can import from `@/components/nodes` without knowing the folder 
 
 - Card layout and selected state
 - Input/output handles
-- Header with icon, title, and state badges
-- Optional AI explanation trigger based on `nodeType` and `nodeConfig`
+- Header with title and state badges
 
 Individual nodes pass their configuration and children to `BaseNode` rather than duplicating layout.
 
 ## Data typing
 
-Node `data` shapes are defined in `src/types` as `XNodeData` interfaces (e.g. `FilterNodeData`, `ChartNodeData`, `AiQueryNodeData`).
+Node `data` shapes are defined in `src/types` as `XNodeData` interfaces (e.g. `FilterNodeData`, `ChartNodeData`, `AiCleanDataNodeData`).
 
 - `BaseNodeData` captures shared fields like `state`, `label`, and `customCode`.
-- `NodeTypeToData` maps React Flow `type` strings (e.g. `'filter'`, `'chart'`, `'aiQuery'`) to their data interfaces.
+- `NodeTypeToData` maps React Flow `type` strings (e.g. `'filter'`, `'chart'`, `'aiCleanData'`) to their data interfaces.
 - `ConvoyNodeData` is the union of all node data types.
 
 When authoring node components, prefer `NodeProps & { data: XNodeData }` so `data`
@@ -73,11 +71,10 @@ To add a new node type, create the component and its `XNodeData` type, then add 
 
 ## AI nodes and code preview
 
-AI-related helpers live in `src/lib/aiNodes.ts` and small UI components under `nodes/ai`:
+Small AI UI components live under `nodes/ai`:
 
 - `AiCallButton` – primary button with built‑in loading state.
 - `AiErrorAlert` – standardized error presentation.
-- `AiSuggestionList` – renders AI-suggested nodes with `NodeCodePreview`.
 
-`AiQueryNode` and `AiAdvisorNode` use these helpers so that AI calls and UI patterns stay consistent.
+`AiCleanDataNode` uses these helpers so that AI calls and UI patterns stay consistent.
 

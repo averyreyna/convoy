@@ -9,12 +9,7 @@ import {
   BarChart3,
   Calculator,
   FlipVertical2,
-  FileInput,
-  Search,
-  MessageCircle,
   Brush,
-  FileText,
-  Bug,
 } from 'lucide-react';
 import { nodeTypeInfos } from '@/components/nodes';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -31,10 +26,9 @@ import {
   divider,
 } from '@/flank';
 
-const AI_NODE_TYPES = new Set(['aiQuery', 'aiAdvisor', 'aiCleanData', 'aiSummarizeData', 'aiDiagnose']);
-const PALETTE_HIDDEN_TYPES = new Set(['canvasNote']);
+const AI_NODE_TYPES = new Set(['aiCleanData']);
 
-export type PaletteCategory = 'ai' | 'data' | 'nodes';
+export type PaletteCategory = 'ai' | 'nodes';
 
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
@@ -46,24 +40,19 @@ const iconMap: Record<string, React.ReactNode> = {
   barChart3: <BarChart3 size={16} />,
   calculator: <Calculator size={16} />,
   flipVertical2: <FlipVertical2 size={16} />,
-  search: <Search size={16} />,
-  messageCircle: <MessageCircle size={16} />,
   brush: <Brush size={16} />,
-  fileText: <FileText size={16} />,
-  bug: <Bug size={16} />,
 };
 
 export function NodePalette({ category }: { category: PaletteCategory }) {
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
-  const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
   const showCodeByDefault = usePreferencesStore((s) => s.showCodeByDefault);
 
   const handleAddNode = (type: string) => {
     const info = nodeTypeInfos.find((n) => n.type === type);
     if (!info) return;
     const supportsCodeMode =
-      type !== 'dataSource' && type !== 'transform' && type !== 'aiQuery' && type !== 'aiAdvisor' && type !== 'aiCleanData' && type !== 'aiSummarizeData' && type !== 'aiDiagnose';
+      type !== 'dataSource' && type !== 'transform' && type !== 'aiCleanData';
     const x = 120 + nodes.length * 320;
     const y = 120;
     addNode({
@@ -87,7 +76,7 @@ export function NodePalette({ category }: { category: PaletteCategory }) {
           <p className={label}>AI</p>
           <div className={listGap}>
             {nodeTypeInfos
-              .filter((info) => AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
+              .filter((info) => AI_NODE_TYPES.has(info.type))
               .sort((a, b) => a.label.localeCompare(b.label))
               .map((info) => (
                 <button
@@ -107,29 +96,12 @@ export function NodePalette({ category }: { category: PaletteCategory }) {
         </div>
       );
     }
-    if (category === 'data') {
-      return (
-        <div className={sectionClass}>
-          <p className={label}>Data</p>
-          <div className={listGap}>
-            <button
-              type="button"
-              onClick={() => setShowImportModal(true)}
-              className={paletteItem}
-            >
-              <FileInput size={14} className={paletteItemIcon} />
-              <span className={paletteItemTitle}>Import Python</span>
-            </button>
-          </div>
-        </div>
-      );
-    }
     return (
       <div className={sectionClass}>
         <p className={label}>Nodes</p>
         <div className={listGap}>
           {nodeTypeInfos
-            .filter((info) => !AI_NODE_TYPES.has(info.type) && !PALETTE_HIDDEN_TYPES.has(info.type))
+            .filter((info) => !AI_NODE_TYPES.has(info.type))
             .sort((a, b) => a.label.localeCompare(b.label))
             .map((info) => (
               <button

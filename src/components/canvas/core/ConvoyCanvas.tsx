@@ -14,15 +14,11 @@ import { nodeTypes } from '@/components/nodes';
 import { edgeTypes } from '@/components/edges';
 import { pageBackground } from '@/flank';
 import { CanvasControls } from './CanvasControls';
-import { ImportFromPythonModal } from '../modals/ImportFromPythonModal';
 import { ProposedPipelineBanner } from '../banners/ProposedPipelineBanner';
 
 export function ConvoyCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
-
-  const showImportModal = useCanvasStore((s) => s.showImportModal);
-  const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
 
   const setViewport = useCanvasStore((s) => s.setViewport);
 
@@ -91,11 +87,6 @@ export function ConvoyCanvas() {
 
       {/* Proposed pipeline banner */}
       <ProposedPipelineBanner />
-
-      {/* Import from Python modal */}
-      {showImportModal && (
-        <ImportFromPythonModal onClose={() => setShowImportModal(false)} />
-      )}
     </div>
   );
 }

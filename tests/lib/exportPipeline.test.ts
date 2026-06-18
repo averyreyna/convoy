@@ -71,32 +71,14 @@ describe('topologicalSort', () => {
 });
 
 describe('pipelineNodesOnly', () => {
-  it('excludes aiQuery and aiAdvisor nodes and edges referencing them', () => {
-    const dataNode = node('d1', 'dataSource');
-    const filterNode = node('f1', 'filter');
-    const aiNode = node('ai1', 'aiQuery');
-    const nodes = [dataNode, filterNode, aiNode];
-    const edges = [
-      edge('e1', 'd1', 'f1'),
-      edge('e2', 'd1', 'ai1'),
-      edge('e3', 'ai1', 'f1'),
-    ];
-    const { nodes: outNodes, edges: outEdges } = pipelineNodesOnly(nodes, edges);
-    expect(outNodes.map((n) => n.id)).toEqual(['d1', 'f1']);
-    expect(outEdges.map((e) => e.id)).toEqual(['e1']);
-  });
-
-  it('keeps only data nodes and edges between them', () => {
+  it('keeps all data nodes and edges between them', () => {
     const a = node('a', 'filter');
     const b = node('b', 'sort');
-    const ai = node('ai', 'aiAdvisor');
-    const nodes = [a, b, ai];
-    const edges = [edge('e1', 'a', 'b'), edge('e2', 'a', 'ai'), edge('e3', 'ai', 'b')];
+    const nodes = [a, b];
+    const edges = [edge('e1', 'a', 'b')];
     const { nodes: outNodes, edges: outEdges } = pipelineNodesOnly(nodes, edges);
-    expect(outNodes).toHaveLength(2);
-    expect(outEdges).toHaveLength(1);
-    expect(outEdges[0].source).toBe('a');
-    expect(outEdges[0].target).toBe('b');
+    expect(outNodes.map((n) => n.id)).toEqual(['a', 'b']);
+    expect(outEdges.map((e) => e.id)).toEqual(['e1']);
   });
 });
 
@@ -104,9 +86,8 @@ describe('topologicalSortPipeline', () => {
   it('applies pipelineNodesOnly then topologicalSort', () => {
     const dataNode = node('d', 'dataSource');
     const filterNode = node('f', 'filter', { column: 'x', operator: 'eq', value: '1' });
-    const aiNode = node('ai', 'aiQuery');
-    const nodes = [filterNode, dataNode, aiNode];
-    const edges = [edge('e1', 'd', 'f'), edge('e2', 'd', 'ai')];
+    const nodes = [filterNode, dataNode];
+    const edges = [edge('e1', 'd', 'f')];
     const sorted = topologicalSortPipeline(nodes, edges);
     expect(sorted.map((n) => n.id)).toEqual(['d', 'f']);
   });
@@ -147,14 +128,6 @@ describe('backwardSlice', () => {
     expect(backwardSlice('chart1', nodes, edges).map((n) => n.id)).toEqual(['a', 'b', 'chart1']);
     expect(backwardSlice('c', nodes, edges).map((n) => n.id)).toEqual(['a', 'c']);
   });
-
-  it('excludes meta/AI nodes from the lineage', () => {
-    const a = node('a', 'dataSource');
-    const ai = node('ai', 'aiQuery');
-    const b = node('b', 'filter');
-    const edges = [edge('e1', 'a', 'ai'), edge('e2', 'a', 'b')];
-    expect(backwardSlice('b', [a, ai, b], edges).map((n) => n.id)).toEqual(['a', 'b']);
-  });
 });
 
 describe('leafPipelineNodes', () => {
@@ -175,13 +148,6 @@ describe('leafPipelineNodes', () => {
     expect(leaves).toEqual(['b', 'c']);
   });
 
-  it('ignores edges to meta/AI nodes when finding leaves', () => {
-    const a = node('a', 'dataSource');
-    const ai = node('ai', 'aiAdvisor');
-    const edges = [edge('e1', 'a', 'ai')];
-    // 'a' only points to an AI node, so within the pipeline it is itself a leaf.
-    expect(leafPipelineNodes([a, ai], edges).map((n) => n.id)).toEqual(['a']);
-  });
 });
 
 describe('exportAsPython', () => {
@@ -215,14 +181,6 @@ describe('pipelineHasBranch', () => {
     const c = node('c', 'sort');
     const edges = [edge('e1', 'a', 'b'), edge('e2', 'a', 'c')];
     expect(pipelineHasBranch([a, b, c], edges)).toBe(true);
-  });
-
-  it('ignores fan-out to meta/AI nodes', () => {
-    const a = node('a', 'dataSource');
-    const b = node('b', 'filter');
-    const ai = node('ai', 'aiQuery');
-    const edges = [edge('e1', 'a', 'b'), edge('e2', 'a', 'ai')];
-    expect(pipelineHasBranch([a, b, ai], edges)).toBe(false);
   });
 });
 

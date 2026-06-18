@@ -17,7 +17,6 @@ export function CanvasControls() {
   const { zoomIn, zoomOut, fitView, setViewport } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const setShowImportModal = useCanvasStore((s) => s.setShowImportModal);
   const setBaselineFromPin = useCanvasStore((s) => s.setBaselineFromPin);
   const setBaselineForNodeIds = useCanvasStore((s) => s.setBaselineForNodeIds);
   const focusNodeIdForView = useCanvasStore((s) => s.focusNodeIdForView);
@@ -74,19 +73,6 @@ export function CanvasControls() {
 
           {showExportMenu && (
             <div className={cn(menuPanel, 'absolute bottom-full right-0 mb-1 w-52')}>
-              <button
-                onClick={() => {
-                  setShowExportMenu(false);
-                  setShowImportModal(true);
-                }}
-                className={menuItem}
-                title="Paste a script or code from Jupyter."
-              >
-                <span className={cn(menuItemIcon, 'flex h-5 w-5 items-center justify-center rounded bg-emerald-100 text-[9px] font-bold text-emerald-700')}>
-                  PY
-                </span>
-                Import from Python
-              </button>
               <button
                 onClick={() => {
                   setShowExportMenu(false);

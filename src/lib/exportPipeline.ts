@@ -41,23 +41,25 @@ export function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
   return sorted.map((id) => nodeMap.get(id)!).filter(Boolean);
 }
 
-const META_NODE_TYPES = ['aiQuery', 'aiAdvisor', 'aiSummarizeData', 'aiDiagnose', 'canvasNote'] as const;
+/**
+ * Node types that are excluded from the runnable pipeline (non-data-processing,
+ * e.g. annotations). Currently empty — every node type produces or consumes data.
+ */
+const META_NODE_TYPES: readonly string[] = [];
 
 /**
- * Exclude AI/meta nodes (e.g. aiQuery, aiAdvisor) and their edges from the pipeline.
- * Used for export and Run all so only data-processing nodes are included.
+ * Exclude meta nodes and their edges from the pipeline. Used for export and
+ * Run all so only data-processing nodes are included.
  */
 export function pipelineNodesOnly(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
-  const nodesFiltered = nodes.filter(
-    (n) => !META_NODE_TYPES.includes(n.type as (typeof META_NODE_TYPES)[number])
-  );
+  const nodesFiltered = nodes.filter((n) => !META_NODE_TYPES.includes(n.type as string));
   const idSet = new Set(nodesFiltered.map((n) => n.id));
   const edgesFiltered = edges.filter((e) => idSet.has(e.source) && idSet.has(e.target));
   return { nodes: nodesFiltered, edges: edgesFiltered };
 }
 
 /**
- * Topological order of pipeline nodes only (excludes aiQuery, aiAdvisor).
+ * Topological order of pipeline (data-processing) nodes only.
  */
 export function topologicalSortPipeline(nodes: Node[], edges: Edge[]): Node[] {
   const { nodes: pNodes, edges: pEdges } = pipelineNodesOnly(nodes, edges);

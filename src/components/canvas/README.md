@@ -3,17 +3,17 @@
 The canvas layer is the orchestration shell around nodes. It is responsible for:
 
 - Rendering the React Flow canvas (`ConvoyCanvas`) and wiring `nodeTypes` / `edgeTypes`.
-- Global canvas controls (`CanvasControls`) such as zoom, fit, reset, and export/import.
+- Global canvas controls (`CanvasControls`) such as zoom, fit, reset, and export.
 - Node discovery and layout helpers (`NodePalette`, `SidebarHeader`).
 - Pipeline code orchestration (`PipelineCodePanel` and its internal toolbar, cell list, and diff views).
-- Import/export and AI-driven pipeline generation (`ImportFromPythonModal`, `EditWithAIAssistant`).
-- Visual affordances like proposed pipeline banners and preferences.
+- AI-driven node editing (`EditWithAIAssistant`).
+- Visual affordances like proposed pipeline banners.
 
 ## Structure
 
 - **core/** — Canvas shell: `ConvoyCanvas`, `CanvasControls`, `NodePalette`, `SidebarHeader`.
-- **panels/** — `PipelineCodePanel`, `PreferencesPanel` (code and settings side panels). Pipeline subcomponents live in `panels/PipelineCodePanel/` (`PipelineCodeToolbar`, `PipelineCellList`, `PipelineFullDiff`).
-- **modals/** — `ImportFromPythonModal`, `ScriptDiffModal`.
+- **panels/** — `PipelineCodePanel` (code side panel). Pipeline subcomponents live in `panels/PipelineCodePanel/` (`PipelineCodeToolbar`, `PipelineCellList`, `PipelineFullDiff`).
+- **modals/** — `ScriptDiffModal`.
 - **banners/** — `ProposedPipelineBanner`.
 - **ai/** — `EditWithAIAssistant` (used by `PipelineCodePanel`).
 

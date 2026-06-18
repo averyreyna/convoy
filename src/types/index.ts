@@ -87,37 +87,11 @@ export interface TransformNodeData extends BaseNodeData {
   outputRowCount?: number;
 }
 
-export interface AiQueryNodeData extends BaseNodeData {
-  query?: string;
-}
-
-export interface AiAdvisorNodeData extends BaseNodeData {
-  question?: string;
-  answer?: string;
-}
-
 export interface AiCleanDataNodeData extends BaseNodeData {
   instruction?: string;
   generatedCode?: string;
   inputRowCount?: number;
   outputRowCount?: number;
-}
-
-export interface AiSummarizeDataNodeData extends BaseNodeData {
-  prompt?: string;
-}
-
-export interface AiDiagnoseNodeData extends BaseNodeData {
-  question?: string;
-}
-
-export interface CanvasNoteNodeData extends BaseNodeData {
-  content: string;
-  /** Dynamic title describing what the note explains (e.g. from summarize/diagnose). */
-  title?: string;
-  sourceNodeId?: string;
-  sourceLabel?: string;
-  noteKind?: 'summary' | string;
 }
 
 export type ConvoyNodeData =
@@ -130,12 +104,7 @@ export type ConvoyNodeData =
   | ComputedColumnNodeData
   | ReshapeNodeData
   | TransformNodeData
-  | AiQueryNodeData
-  | AiAdvisorNodeData
-  | AiCleanDataNodeData
-  | AiSummarizeDataNodeData
-  | AiDiagnoseNodeData
-  | CanvasNoteNodeData;
+  | AiCleanDataNodeData;
 
 export interface NodeTypeToData {
   dataSource: DataSourceNodeData;
@@ -147,12 +116,7 @@ export interface NodeTypeToData {
   chart: ChartNodeData;
   computedColumn: ComputedColumnNodeData;
   reshape: ReshapeNodeData;
-  aiQuery: AiQueryNodeData;
-  aiAdvisor: AiAdvisorNodeData;
   aiCleanData: AiCleanDataNodeData;
-  aiSummarizeData: AiSummarizeDataNodeData;
-  aiDiagnose: AiDiagnoseNodeData;
-  canvasNote: CanvasNoteNodeData;
 }
 
 export type NodeType = keyof NodeTypeToData;

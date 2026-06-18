@@ -15,7 +15,6 @@ import {
   panelSectionHeader,
   divider,
 } from '@/flank';
-import { ExplanationPopover } from './ExplanationPopover';
 import { computeNodeDetailMode, type NodeDetailMode } from './nodeDetailMode';
 
 export type NodeState = 'proposed' | 'confirmed' | 'running' | 'error';
@@ -47,16 +46,10 @@ export const BaseNode = memo(function BaseNode({
   nodeId,
   state,
   title,
-  icon,
   children,
   inputs = 1,
   outputs = 1,
   onConfirm,
-  nodeType,
-  nodeConfig,
-  inputRowCount,
-  outputRowCount,
-  customCode,
   wide,
   errorMessage,
   selected,
@@ -77,8 +70,6 @@ export const BaseNode = memo(function BaseNode({
     detailModeRef.current = next;
     return next;
   }, [detailMode, zoom]);
-
-  const showExplanation = state === 'confirmed' && nodeType && nodeConfig;
 
   return (
     <div
@@ -140,14 +131,6 @@ export const BaseNode = memo(function BaseNode({
         <div className="ml-auto flex items-center gap-1">
           {isExecuting && (
             <Loader2 size={14} className="animate-spin text-gray-500" aria-label="Running" />
-          )}
-          {showExplanation && (
-            <ExplanationPopover
-              nodeType={nodeType}
-              nodeConfig={nodeConfig}
-              inputRowCount={inputRowCount}
-              outputRowCount={outputRowCount}
-            />
           )}
           {state === 'proposed' && (
             <span className={cn(badge.base, badge.variants.proposed)}>Proposed</span>

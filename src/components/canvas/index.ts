@@ -6,9 +6,7 @@ export { NodePaletteSidebar } from './core/NodePaletteSidebar';
 export { SidebarHeader } from './core/SidebarHeader';
 
 export { PipelineCodePanel } from './panels/PipelineCodePanel';
-export { PreferencesPanel } from './panels/PreferencesPanel';
 
-export { ImportFromPythonModal } from './modals/ImportFromPythonModal';
 export { ScriptDiffModal } from './modals/ScriptDiffModal';
 
 export { ProposedPipelineBanner } from './banners/ProposedPipelineBanner';
