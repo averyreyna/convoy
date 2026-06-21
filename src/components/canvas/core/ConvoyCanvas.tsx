@@ -67,7 +67,7 @@ export function ConvoyCanvas() {
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1}
-          color="#d1d5db"
+          color="#cfc9ba"
         />
         <MiniMap
           nodeStrokeWidth={2}

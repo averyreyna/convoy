@@ -50,6 +50,7 @@ export function PipelineCodePanel() {
   const applyImportToExistingPipeline = useCanvasStore((s) => s.applyImportToExistingPipeline);
   const setPipelineFromImport = useCanvasStore((s) => s.setPipelineFromImport);
   const replaceNodesWithSuggestedPipeline = useCanvasStore((s) => s.replaceNodesWithSuggestedPipeline);
+  const addCellAsNode = useCanvasStore((s) => s.addCellAsNode);
   const setFocusNodeIdForView = useCanvasStore((s) => s.setFocusNodeIdForView);
   const setSelectedNodeIds = useCanvasStore((s) => s.setSelectedNodeIds);
   const setBaselineFromPin = useCanvasStore((s) => s.setBaselineFromPin);
@@ -411,6 +412,27 @@ export function PipelineCodePanel() {
       });
     },
     [codeCells, dataSourceColumnNames, runScriptAndImport, runSliceForNode]
+  );
+
+  // Code-first creation: materialize a draft cell as a typed node locally, with
+  // no server run. Anchors to the current pipeline leaf (the draft chains off the
+  // last node cell's output, matching how drafts are previewed).
+  const handleAddCellAsNode = useCallback(
+    (draftId: string) => {
+      const draft = draftCells.find((d) => d.id === draftId);
+      if (!draft) return;
+      const sorted = topologicalSortPipeline(nodes, edges);
+      const anchorId = sorted.length > 0 ? sorted[sorted.length - 1].id : undefined;
+      const newNodeId = addCellAsNode(
+        draft.code,
+        anchorId ? { insertAfterNodeId: anchorId } : undefined
+      );
+      if (!newNodeId) return;
+      setDraftCells((prev) => prev.filter((d) => d.id !== draftId));
+      setSelectedNodeIds([newNodeId]);
+      activateCell(newNodeId);
+    },
+    [draftCells, nodes, edges, addCellAsNode, setSelectedNodeIds, activateCell]
   );
 
   const handleCellChange = useCallback(
@@ -784,6 +806,7 @@ export function PipelineCodePanel() {
             onActivateCell={activateCell}
             onClearFocusedCell={() => setFocusedCellNodeId(null)}
             onCellCodeChange={handleCellChange}
+            onAddCellAsNode={handleAddCellAsNode}
             onRevertCell={handleRevertCell}
             onAcceptAsBaseline={handleAcceptAsBaseline}
           />

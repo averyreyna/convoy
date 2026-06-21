@@ -1,7 +1,7 @@
 import type { Node } from '@xyflow/react';
 import type { Change } from 'diff';
 import { diffLines } from 'diff';
-import { ChevronDown, ChevronRight, Play } from 'lucide-react';
+import { ChevronDown, ChevronRight, Play, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Schema, SchemaDiagnostic } from '@/lib/inferSchema';
 import { unknownSchema } from '@/lib/inferSchema';
@@ -70,6 +70,8 @@ interface PipelineCellListProps {
   onCellCodeChange: (nodeId: string, code: string) => void;
   onRevertCell?: (nodeId: string) => void;
   onAcceptAsBaseline?: (nodeId: string) => void;
+  /** Materialize a draft cell as a typed node locally (no run). Drafts only. */
+  onAddCellAsNode?: (draftId: string) => void;
 }
 
 export function PipelineCellList({
@@ -91,6 +93,7 @@ export function PipelineCellList({
   onCellCodeChange,
   onRevertCell,
   onAcceptAsBaseline,
+  onAddCellAsNode,
 }: PipelineCellListProps) {
   const hoveredNodeId = useCanvasStore((s) => s.hoveredNodeId);
   const staleNodeIds = useCanvasStore((s) => s.staleNodeIds);
@@ -215,6 +218,24 @@ export function PipelineCellList({
               >
                 <Play size={10} />
               </button>
+              {!isNodeBacked && onAddCellAsNode && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddCellAsNode(cell.nodeId);
+                  }}
+                  className={cn(
+                    button.base,
+                    button.variants.ghost,
+                    'rounded p-0.5 text-indigo-600 hover:bg-indigo-50'
+                  )}
+                  title="Add as a typed node — no run"
+                  aria-label="Add as node"
+                >
+                  <Workflow size={10} />
+                </button>
+              )}
             </div>
             <div className={notebookCellContent}>
               <div className={notebookCellHeader}>

@@ -11,7 +11,37 @@ import {
 } from '@xyflow/react';
 import type { EdgeStatus, ProposedPipeline, SuggestedPipelineNode } from '@/types';
 import { topologicalSortPipeline } from '@/lib/exportPipeline';
+import { classifyCell } from '@/lib/inferSchema';
 import { usePreferencesStore } from './preferencesStore';
+
+/**
+ * Split a draft cell into its leading comment (used as the node label) and the
+ * code body to classify. Leading blank/`#` lines are the label source; the
+ * remaining lines are the executable body. A body that is empty or comment-only
+ * is a hole — nothing to materialize.
+ */
+function splitLeadingComment(code: string): { label?: string; body: string } {
+  const lines = code.split('\n');
+  let i = 0;
+  let label: string | undefined;
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    if (trimmed === '') {
+      i++;
+      continue;
+    }
+    if (trimmed.startsWith('#')) {
+      if (!label) {
+        const text = trimmed.replace(/^#+\s*/, '').trim();
+        if (text) label = text;
+      }
+      i++;
+      continue;
+    }
+    break;
+  }
+  return { label, body: lines.slice(i).join('\n').trim() };
+}
 
 export interface ApplyImportOptions {
   /** When set (Run cell at index K), only update existing nodes at indices 0..K. */
@@ -86,6 +116,16 @@ interface CanvasStore {
   setPipelineFromImport: (pipeline: ProposedPipeline) => void;
   applyImportToExistingPipeline: (pipeline: ProposedPipeline, options?: ApplyImportOptions) => void;
   replaceNodesWithSuggestedPipeline: (nodeIdsToReplace: string[], suggested: { nodes: SuggestedPipelineNode[] }, options?: { insertAfterNodeId?: string }) => void;
+  /**
+   * Materialize a draft code cell as a typed node locally — no server round-trip.
+   * Classifies the code (classifyCell) into a structured node, or a transform
+   * carrying the verbatim code when opaque, then inserts it after
+   * `insertAfterNodeId` (defaults to the current pipeline leaf) using the same
+   * edge-rewire path as the AI insert. Returns the new node id, or null when the
+   * cell is empty / a comment-only hole. This is the code-first mirror of node
+   * creation: type pandas, get a typed node, round-trip preserved.
+   */
+  addCellAsNode: (code: string, options?: { insertAfterNodeId?: string }) => string | null;
   confirmAllProposed: () => void;
   clearProposed: () => void;
 
@@ -621,6 +661,83 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       edges,
       executionDebounceBypassUntil: Date.now() + 2000,
     });
+  },
+
+  addCellAsNode: (code, options) => {
+    const { label, body } = splitLeadingComment(code);
+    if (body === '' || body.startsWith('#')) return null;
+
+    const { nodes: existingNodes, edges: existingEdges } = get();
+    const sorted = topologicalSortPipeline(existingNodes, existingEdges);
+    const anchorId =
+      options?.insertAfterNodeId ??
+      (sorted.length > 0 ? sorted[sorted.length - 1].id : undefined);
+    const anchor = anchorId ? existingNodes.find((n) => n.id === anchorId) : undefined;
+
+    // classifyCell matches only structured, single-statement verbs; opaque code
+    // (incl. join-shaped cells, which never match) falls through to a transform
+    // carrying the verbatim body — the escape hatch. A matched node stores config
+    // only and lets codegen reproject the code (source-of-truth: canonicalize on
+    // commit), so the round-trip holds.
+    const classified = classifyCell(body);
+    const nodeType = classified ? classified.type : 'transform';
+    const supportsCodeMode =
+      nodeType !== 'dataSource' && nodeType !== 'transform' && nodeType !== 'aiCleanData';
+    const showCodeByDefault = usePreferencesStore.getState().showCodeByDefault;
+    const nodeId = `cell-${Date.now()}`;
+
+    const data: Record<string, unknown> = {
+      state: 'confirmed' as const,
+      label: label ?? nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
+      ...(classified ? classified.config : { customCode: body }),
+      ...(supportsCodeMode ? { isCodeMode: showCodeByDefault } : {}),
+    };
+
+    const newNode: Node = {
+      id: nodeId,
+      type: nodeType,
+      position: anchor
+        ? { x: anchor.position.x + 320, y: anchor.position.y }
+        : { x: 120, y: 120 },
+      data,
+    };
+
+    // Insert into the chain after the anchor: rewire the anchor's downstream
+    // edges to come from the new node (a pure append when the anchor is a leaf).
+    const downstreamIds = anchorId
+      ? [...new Set(existingEdges.filter((e) => e.source === anchorId).map((e) => e.target))]
+      : [];
+    const keptEdges = existingEdges.filter(
+      (e) => !(e.source === anchorId && downstreamIds.includes(e.target))
+    );
+    const newEdges: Edge[] = [];
+    if (anchorId) {
+      newEdges.push({
+        id: `edge-${anchorId}-${nodeId}`,
+        source: anchorId,
+        target: nodeId,
+        sourceHandle: 'source',
+        targetHandle: 'target',
+        type: 'dataFlow',
+        animated: true,
+      });
+    }
+    for (const targetId of downstreamIds) {
+      newEdges.push({
+        id: `edge-${nodeId}-${targetId}`,
+        source: nodeId,
+        target: targetId,
+        sourceHandle: 'source',
+        targetHandle: 'target',
+        type: 'dataFlow',
+        animated: true,
+      });
+    }
+
+    const nodes = [...existingNodes, newNode];
+    const edges = recomputeEdgeStatuses(nodes, [...keptEdges, ...newEdges]);
+    set({ nodes, edges, executionDebounceBypassUntil: Date.now() + 2000 });
+    return nodeId;
   },
 
   confirmAllProposed: () =>

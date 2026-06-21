@@ -3,18 +3,20 @@
  * Used by theme index to create CSS variables.
  */
 export const colors = {
+  // Warm-gray ramp (subtle, prototype-y). Same keys as Tailwind's gray so all
+  // `vars.color.gray[*]` and mirrored `bg-gray-*` utilities pick up the warmth.
   gray: {
-    50: '#f9fafb',
-    100: '#f3f4f6',
-    200: '#e5e7eb',
-    300: '#d1d5db',
-    400: '#9ca3af',
-    500: '#6b7280',
-    600: '#4b5563',
-    700: '#374151',
-    800: '#1f2937',
-    900: '#111827',
-    950: '#030712',
+    50: '#f5f4f1',
+    100: '#ecebe7',
+    200: '#ddd9d1',
+    300: '#cfc9ba',
+    400: '#a8a394',
+    500: '#6f6b60',
+    600: '#54514a',
+    700: '#3d3a32',
+    800: '#332f29',
+    900: '#2b2b28',
+    950: '#1c1b18',
   },
   blue: {
     50: '#eff6ff',

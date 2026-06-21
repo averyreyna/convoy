@@ -52,14 +52,14 @@ export function PipelineCodeToolbar({
 
   return (
     <div className="flex w-full shrink-0 flex-col gap-2">
+    <div className="flex flex-col gap-0.5">
+      <span className={label}>Pipeline code</span>
+      <span className={cn(captionMuted, 'leading-relaxed')}>
+        Same order as exported notebook. Edit here or download to open in Jupyter.
+      </span>
+    </div>
     <div className="flex w-full items-center justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <div className="flex min-w-[220px] flex-col gap-1">
-          <span className={label}>Pipeline code</span>
-          <span className={cn(captionMuted, 'leading-relaxed')}>
-            Same order as exported notebook. Edit here or download to open in Jupyter.
-          </span>
-        </div>
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onToggleEditWithAI}

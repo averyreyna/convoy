@@ -26,9 +26,7 @@ import {
   divider,
 } from '@/flank';
 
-const AI_NODE_TYPES = new Set(['aiCleanData']);
-
-export type PaletteCategory = 'ai' | 'nodes';
+export type PaletteCategory = 'nodes';
 
 const iconMap: Record<string, React.ReactNode> = {
   table: <Table size={16} />,
@@ -43,7 +41,7 @@ const iconMap: Record<string, React.ReactNode> = {
   brush: <Brush size={16} />,
 };
 
-export function NodePalette({ category }: { category: PaletteCategory }) {
+export function NodePalette() {
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const showCodeByDefault = usePreferencesStore((s) => s.showCodeByDefault);
@@ -66,17 +64,14 @@ export function NodePalette({ category }: { category: PaletteCategory }) {
     });
   };
 
-  const sectionClass = cn(panelSection, 'border-b-0 py-1.5');
-  const listGap = 'flex flex-col gap-0.5 mt-0.5';
-
-  const renderSection = () => {
-    if (category === 'ai') {
-      return (
-        <div className={sectionClass}>
-          <p className={label}>AI</p>
-          <div className={listGap}>
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
+        <div className={cn(panelSection, 'border-b-0 py-1.5')}>
+          <p className={label}>Nodes</p>
+          <div className="flex flex-col gap-0.5 mt-0.5">
             {nodeTypeInfos
-              .filter((info) => AI_NODE_TYPES.has(info.type))
+              .slice()
               .sort((a, b) => a.label.localeCompare(b.label))
               .map((info) => (
                 <button
@@ -94,47 +89,13 @@ export function NodePalette({ category }: { category: PaletteCategory }) {
               ))}
           </div>
         </div>
-      );
-    }
-    return (
-      <div className={sectionClass}>
-        <p className={label}>Nodes</p>
-        <div className={listGap}>
-          {nodeTypeInfos
-            .filter((info) => !AI_NODE_TYPES.has(info.type))
-            .sort((a, b) => a.label.localeCompare(b.label))
-            .map((info) => (
-              <button
-                key={info.type}
-                type="button"
-                onClick={() => handleAddNode(info.type)}
-                className={paletteItem}
-              >
-                <span className={paletteItemIcon}>{iconMap[info.icon]}</span>
-                <div className="min-w-0 flex-1">
-                  <div className={paletteItemTitle}>{info.label}</div>
-                  <div className={paletteItemDescription}>{info.description}</div>
-                </div>
-              </button>
-            ))}
-        </div>
       </div>
-    );
-  };
 
-  return (
-    <>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
-          {renderSection()}
-        </div>
-
-        <div className={cn(divider, panelSectionHeader, 'border-b-0 border-t-0 py-1.5')}>
-          <p className={cn('text-center', captionMuted)}>
-            Connect nodes by dragging between handles
-          </p>
-        </div>
+      <div className={cn(divider, panelSectionHeader, 'border-b-0 border-t-0 py-1.5')}>
+        <p className={cn('text-center', captionMuted)}>
+          Connect nodes by dragging between handles
+        </p>
       </div>
-    </>
+    </div>
   );
 }

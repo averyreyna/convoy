@@ -83,7 +83,7 @@ export default function App() {
               transform: 'translateY(-50%)',
             }}
           >
-            <NodePalette category={sidebarActiveTab} />
+            <NodePalette />
           </div>
         )}
 
